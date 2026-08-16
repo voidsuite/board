@@ -17,6 +17,7 @@ import {
   updateSessionTokens,
   type SessionUser,
 } from "../db/sessions.js"
+import { storePkceState, takePkceVerifier } from "../db/pkce.js"
 import {
   buildAuthorizeParams,
   authorizeUrl,
@@ -26,7 +27,6 @@ import {
   validateBearerToken,
 } from "../lib/oauth.js"
 
-const PKCE_VERIFIERS = new Map<string, string>()
 const PKCE_STATE_COOKIE = "voidboard_pkce_state"
 
 function pkceStateCookieOptions(): Record<string, string | boolean | number> {
@@ -44,7 +44,7 @@ const auth = new Hono()
 // GET /api/auth/login → { authUrl } (starts PKCE, binds state to this browser)
 auth.get("/login", async (c) => {
   const { params, verifier, state } = buildAuthorizeParams()
-  PKCE_VERIFIERS.set(state, verifier)
+  storePkceState(state, verifier)
   setCookie(c, PKCE_STATE_COOKIE, state, pkceStateCookieOptions())
   return c.json({ authUrl: authorizeUrl(params) })
 })
@@ -63,9 +63,10 @@ auth.post("/exchange", async (c) => {
   if (!stateCookie || stateCookie !== state) {
     return c.json({ error: "Invalid OAuth state" }, 400)
   }
-  const verifier = PKCE_VERIFIERS.get(state)
+  // The verifier lives in SQLite (not memory) so an in-flight login survives
+  // gateway restarts. Consumed once, expired states count as missing.
+  const verifier = takePkceVerifier(state)
   if (!verifier) return c.json({ error: "Invalid or expired state" }, 400)
-  PKCE_VERIFIERS.delete(state)
   deleteCookie(c, PKCE_STATE_COOKIE)
 
   try {

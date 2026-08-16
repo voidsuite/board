@@ -21,6 +21,15 @@ CREATE TABLE IF NOT EXISTS sessions (
   created_at    INTEGER NOT NULL
 );
 
+-- In-flight OAuth login attempts (PKCE verifiers). Persisted instead of kept
+-- in memory so a gateway restart mid-login doesn't invalidate the flow.
+CREATE TABLE IF NOT EXISTS pkce_states (
+  state      TEXT PRIMARY KEY,             -- the OAuth state bound to the browser cookie
+  verifier   TEXT NOT NULL,                -- PKCE code_verifier (consumed once)
+  expires_at INTEGER NOT NULL,             -- epoch ms
+  created_at INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS workspaces (
   id            TEXT PRIMARY KEY,
   name          TEXT NOT NULL,
@@ -141,6 +150,7 @@ CREATE TABLE IF NOT EXISTS item_activity (
 );
 
 CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_pkce_expiry ON pkce_states(expires_at);
 CREATE INDEX IF NOT EXISTS idx_members_user ON workspace_members(user_id);
 CREATE INDEX IF NOT EXISTS idx_boards_workspace ON boards(workspace_id, position);
 CREATE INDEX IF NOT EXISTS idx_items_board ON items(board_id, position);
