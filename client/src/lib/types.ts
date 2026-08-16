@@ -23,6 +23,8 @@ export interface WorkspaceMember {
 export interface Workspace {
   id: string
   name: string
+  /** Avatar file id (uploaded via /api/files) — null = initials tile. */
+  avatarFileId: string | null
   ownerId: string
   /** Rotatable share token — anyone with /join/<token> becomes a member. */
   inviteToken: string | null
@@ -47,6 +49,8 @@ export interface Board {
   workspaceId: string
   projectId: string | null
   name: string
+  /** Avatar file id (uploaded via /api/files) — null = initials tile. */
+  avatarFileId: string | null
   position: number
   createdAt: number
   updatedAt: number

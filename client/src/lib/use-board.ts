@@ -44,6 +44,8 @@ export interface BoardStore {
   setColumnWip: (columnId: string, wipLimit: number | null) => Promise<void>
   deleteColumn: (columnId: string) => Promise<void>
   renameBoard: (name: string) => Promise<void>
+  /** Set (upload) or clear (null) the board avatar photo. */
+  setBoardAvatar: (file: File | null) => Promise<void>
   // item ops
   createItem: (columnId: string, title: string) => Promise<void>
   updateItem: (itemId: string, patch: Partial<Pick<Item, "title" | "description" | "priority" | "dueDate" | "coverFileId">>) => Promise<void>
@@ -219,6 +221,17 @@ export function useBoard(boardId: string): BoardStore {
       setBoard(updated)
     },
     [board]
+  )
+
+  const setBoardAvatar = React.useCallback(
+    async (file: File | null) => {
+      if (!board) return
+      if (!workspace) throw new Error("Workspace not loaded")
+      const avatarFileId = file ? (await api.uploadFile(workspace.id, file)).id : null
+      const updated = await api.updateBoard(board.id, { avatarFileId })
+      setBoard(updated)
+    },
+    [board, workspace]
   )
 
   const setColumnWip = React.useCallback(
@@ -537,7 +550,7 @@ export function useBoard(boardId: string): BoardStore {
   return {
     status, error, board, workspace, columns, labels, getLabel, itemsIn, item, reload, refresh,
     socketState, presence, viewers, sendCursor,
-    createColumn, renameColumn, setColumnWip, deleteColumn, renameBoard,
+    createColumn, renameColumn, setColumnWip, deleteColumn, renameBoard, setBoardAvatar,
     createItem, updateItem, moveItem, deleteItem,
     createLabel, updateLabel, deleteLabel, setItemLabels, setItemAssignees,
     addComment, addChecklistEntry, setChecklistEntry, deleteChecklistEntry,

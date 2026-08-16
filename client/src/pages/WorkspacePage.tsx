@@ -9,7 +9,8 @@ import {
   ArrowLeft, ChevronRight, FolderKanban, LayoutGrid, MoreHorizontal, PenLine, Plus, Trash2, UserPlus,
 } from "lucide-react"
 import { AppShell } from "@/components/app-shell"
-import { WorkspaceIcon, initials } from "@/components/workspace-icon"
+import { initials } from "@/components/workspace-icon"
+import { AvatarPicker } from "@/components/avatar-picker"
 import { MembersDialog } from "@/components/members-dialog"
 import { PromptDialog } from "@/components/prompt-dialog"
 import { ConfirmDialog } from "@/components/confirm-dialog"
@@ -76,6 +77,29 @@ export function WorkspacePage() {
   const canManage = myRole === "owner" || myRole === "admin"
 
   // --- mutations ---
+
+  const setWorkspaceAvatar = async (file: File) => {
+    try {
+      const meta = await api.uploadFile(workspaceId, file)
+      const ws = await api.updateWorkspace(workspaceId, { avatarFileId: meta.id })
+      setWorkspace(ws)
+      toast({ title: "Photo updated", variant: "success" })
+    } catch (e) {
+      toast({ title: "Couldn't update photo", description: e instanceof Error ? e.message : undefined, variant: "destructive" })
+      throw e
+    }
+  }
+
+  const removeWorkspaceAvatar = async () => {
+    try {
+      const ws = await api.updateWorkspace(workspaceId, { avatarFileId: null })
+      setWorkspace(ws)
+      toast({ title: "Photo removed", variant: "success" })
+    } catch (e) {
+      toast({ title: "Couldn't remove photo", description: e instanceof Error ? e.message : undefined, variant: "destructive" })
+      throw e
+    }
+  }
 
   const createProject = async (name: string) => {
     try {
@@ -182,7 +206,15 @@ export function WorkspacePage() {
           {/* Hero */}
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
             <div className="flex items-start gap-4">
-              <WorkspaceIcon id={workspace.id} name={workspace.name} size="lg" />
+              <AvatarPicker
+                fileId={workspace.avatarFileId}
+                name={workspace.name}
+                seed={workspace.id}
+                size="lg"
+                canEdit={canManage}
+                onUpload={setWorkspaceAvatar}
+                onRemove={removeWorkspaceAvatar}
+              />
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <h1 className="text-xl font-semibold tracking-tight">{workspace.name}</h1>
@@ -331,7 +363,12 @@ export function WorkspacePage() {
                       <CardHeader className="p-4">
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
-                            <CardTitle className="truncate text-base">{b.name}</CardTitle>
+                            <div className="flex items-center gap-2">
+                              {b.avatarFileId ? (
+                                <img src={api.fileUrl(b.avatarFileId)} alt="" className="size-6 shrink-0 rounded-md object-cover" />
+                              ) : null}
+                              <CardTitle className="min-w-0 truncate text-base">{b.name}</CardTitle>
+                            </div>
                             {project ? (
                               <Badge variant="secondary" className="mt-1.5 gap-1.5 text-[10px] font-normal">
                                 <span className="size-2 rounded-full" style={{ background: project.color }} aria-hidden="true" />

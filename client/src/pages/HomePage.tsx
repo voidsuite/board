@@ -7,7 +7,8 @@ import * as React from "react"
 import { Link, useNavigate } from "react-router"
 import { ChevronRight, FolderKanban, MoreHorizontal, PenLine, Plus, Trash2 } from "lucide-react"
 import { AppShell } from "@/components/app-shell"
-import { WorkspaceIcon, initials } from "@/components/workspace-icon"
+import { initials } from "@/components/workspace-icon"
+import { AvatarPicker } from "@/components/avatar-picker"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarGroup, AvatarGroupCount, AvatarImage } from "@/components/ui/avatar"
@@ -124,7 +125,7 @@ export function HomePage() {
               <Card key={ws.id} className="group relative transition-shadow hover:shadow-md">
                 <Link to={`/w/${ws.id}`} className="absolute inset-0 z-0 rounded-xl" aria-label={`Open ${ws.name}`} />
                 <CardHeader className="flex-row items-start gap-3 space-y-0 p-4">
-                  <WorkspaceIcon id={ws.id} name={ws.name} className="mt-0.5" />
+                  <AvatarPicker fileId={ws.avatarFileId} name={ws.name} seed={ws.id} size="md" className="mt-0.5" />
                   <div className="min-w-0 flex-1 pr-6">
                     <CardTitle className="truncate text-base">{ws.name}</CardTitle>
                     <p className="mt-0.5 text-xs text-muted-foreground">

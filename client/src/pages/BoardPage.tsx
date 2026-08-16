@@ -17,6 +17,7 @@ import { PromptDialog } from "@/components/prompt-dialog"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import { BoardColumn, type DragState } from "@/components/board/board-column"
 import { ItemDialog, BoardContext } from "@/components/board/item-dialog"
+import { AvatarPicker } from "@/components/avatar-picker"
 import { FilterBar, EMPTY_FILTERS, activeFilterCount, matchesFilters, type BoardFilters } from "@/components/board/filter-bar"
 import { TableView } from "@/components/board/table-view"
 import { ListView } from "@/components/board/list-view"
@@ -63,6 +64,10 @@ export function BoardPage() {
   // board view additionally filters per-column; table/list use this flat list.
   const visibleItems = board.columns.flatMap((c) => board.itemsIn(c.id)).filter((i) => matchesFilters(i, filters))
 
+  // Owner/admins can change the board avatar; everyone else just sees it.
+  const boardRole = board.workspace?.members.find((m) => m.userId === user?.id)?.role
+  const canManageBoard = boardRole === "owner" || boardRole === "admin"
+
   // Clear the drag state when a native drag ends outside a drop target.
   React.useEffect(() => {
     const clear = () => setDragState(null)
@@ -101,6 +106,26 @@ export function BoardPage() {
       await board.renameBoard(name)
     } catch (e) {
       toast({ title: "Couldn't rename board", description: e instanceof Error ? e.message : undefined, variant: "destructive" })
+      throw e
+    }
+  }
+
+  const setBoardAvatar = async (file: File) => {
+    try {
+      await board.setBoardAvatar(file)
+      toast({ title: "Board photo updated", variant: "success" })
+    } catch (e) {
+      toast({ title: "Couldn't update photo", description: e instanceof Error ? e.message : undefined, variant: "destructive" })
+      throw e
+    }
+  }
+
+  const removeBoardAvatar = async () => {
+    try {
+      await board.setBoardAvatar(null)
+      toast({ title: "Board photo removed", variant: "success" })
+    } catch (e) {
+      toast({ title: "Couldn't remove photo", description: e instanceof Error ? e.message : undefined, variant: "destructive" })
       throw e
     }
   }
@@ -181,6 +206,15 @@ export function BoardPage() {
           <span className="truncate">{board.workspace?.name ?? "Workspace"}</span>
         </Link>
         <span className="text-muted-foreground/40" aria-hidden="true">/</span>
+        <AvatarPicker
+          fileId={board.board.avatarFileId}
+          name={board.board.name}
+          seed={board.board.id}
+          size="sm"
+          canEdit={canManageBoard}
+          onUpload={setBoardAvatar}
+          onRemove={removeBoardAvatar}
+        />
         <button
           onClick={() => setRenameBoardOpen(true)}
           className="min-w-0 truncate rounded-lg px-1.5 py-1 text-left text-sm font-semibold transition-colors hover:bg-accent"

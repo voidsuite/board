@@ -150,7 +150,16 @@ export function createWorkspace(name: string): Promise<Workspace> {
 }
 
 export function renameWorkspace(id: string, name: string): Promise<Workspace> {
-  return gateway(`/api/workspaces/${id}`, { method: "PATCH", body: JSON.stringify({ name }) })
+  return updateWorkspace(id, { name })
+}
+
+export interface WorkspacePatch {
+  name?: string
+  avatarFileId?: string | null
+}
+
+export function updateWorkspace(id: string, patch: WorkspacePatch): Promise<Workspace> {
+  return gateway(`/api/workspaces/${id}`, { method: "PATCH", body: JSON.stringify(patch) })
 }
 
 export function deleteWorkspace(id: string): Promise<void> {
@@ -208,7 +217,16 @@ export function createBoard(workspaceId: string, name: string, projectId?: strin
 }
 
 export function renameBoard(id: string, name: string): Promise<Board> {
-  return gateway(`/api/boards/${id}`, { method: "PATCH", body: JSON.stringify({ name }) })
+  return updateBoard(id, { name })
+}
+
+export interface BoardPatch {
+  name?: string
+  avatarFileId?: string | null
+}
+
+export function updateBoard(id: string, patch: BoardPatch): Promise<Board> {
+  return gateway(`/api/boards/${id}`, { method: "PATCH", body: JSON.stringify(patch) })
 }
 
 export function deleteBoard(id: string): Promise<void> {
