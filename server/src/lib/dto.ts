@@ -210,7 +210,7 @@ const itemChecklistStmt = db.query(`
 `)
 
 const itemCommentsStmt = db.query(`
-  SELECT cm.id, cm.item_id AS itemId, cm.body, cm.created_at AS createdAt, cm.updated_at AS updatedAt,
+  SELECT cm.id, cm.item_id AS itemId, cm.parent_id AS parentId, cm.body, cm.created_at AS createdAt, cm.updated_at AS updatedAt,
          u.id AS authorId, u.name AS authorName, u.picture AS authorPicture
   FROM comments cm JOIN users u ON u.id = cm.author_id
   WHERE cm.item_id = ? ORDER BY cm.created_at ASC
@@ -247,6 +247,7 @@ export interface ItemDto {
   comments: {
     id: string
     itemId: string
+    parentId: string | null
     body: string
     author: { id: string; name: string; picture?: string | null }
     createdAt: number
@@ -300,6 +301,7 @@ export function serializeItem(id: string): ItemDto | null {
   const comments = (itemCommentsStmt.all(id) as {
     id: string
     itemId: string
+    parentId: string | null
     body: string
     createdAt: number
     updatedAt: number
@@ -309,6 +311,7 @@ export function serializeItem(id: string): ItemDto | null {
   }[]).map((cm) => ({
     id: cm.id,
     itemId: cm.itemId,
+    parentId: cm.parentId,
     body: cm.body,
     author: { id: cm.authorId, name: cm.authorName, picture: cm.authorPicture },
     createdAt: cm.createdAt,

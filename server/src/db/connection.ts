@@ -20,6 +20,15 @@ db.exec("PRAGMA foreign_keys = ON;")
 // Apply schema.sql — idempotent (all statements use IF NOT EXISTS).
 const schema = readFileSync(path.join(import.meta.dir, "schema.sql"), "utf8")
 db.exec(schema)
+
+// One-off column migrations for databases created before a column existed.
+// `CREATE TABLE IF NOT EXISTS` won't add columns, so patch them here.
+const commentCols = db.query("PRAGMA table_info(comments)").all() as { name: string }[]
+if (!commentCols.some((c) => c.name === "parent_id")) {
+  db.exec("ALTER TABLE comments ADD COLUMN parent_id TEXT REFERENCES comments(id) ON DELETE CASCADE;")
+}
+db.exec("CREATE INDEX IF NOT EXISTS idx_comments_parent ON comments(parent_id);")
+
 db.exec("PRAGMA optimize;")
 
 export function now(): number {

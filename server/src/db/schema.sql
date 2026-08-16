@@ -117,6 +117,7 @@ CREATE TABLE IF NOT EXISTS comments (
   id         TEXT PRIMARY KEY,
   item_id    TEXT NOT NULL REFERENCES items(id) ON DELETE CASCADE,
   author_id  TEXT NOT NULL REFERENCES users(id),
+  parent_id  TEXT REFERENCES comments(id) ON DELETE CASCADE,  -- NULL = top-level, else a reply
   body       TEXT NOT NULL,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL

@@ -239,6 +239,45 @@ routes.post("/labels", async (c) => {
   return c.json(label, 201)
 })
 
+routes.patch("/labels/:id", async (c) => {
+  const { user } = getAuthUser(c)!
+  const id = c.req.param("id")
+  const row = db.query("SELECT id, board_id AS boardId FROM labels WHERE id = ?").get(id) as { id: string; boardId: string } | null
+  if (!row) return c.json({ error: "Not found" }, 404)
+  if (!boardWorkspace(row.boardId, user.id)) return c.json({ error: "Forbidden" }, 403)
+  const body = await c.req.json().catch(() => null)
+
+  const patch: string[] = []
+  const values: string[] = []
+  if (typeof body?.name === "string" && body.name.trim()) {
+    patch.push("name = ?")
+    values.push(body.name.trim().slice(0, 50))
+  }
+  if (/^#[0-9a-fA-F]{6}$/.test(String(body?.color || ""))) {
+    patch.push("color = ?")
+    values.push(String(body.color))
+  }
+  if (patch.length) db.query(`UPDATE labels SET ${patch.join(", ")} WHERE id = ?`).run(...values, id)
+  const label = db.query("SELECT id, board_id AS boardId, name, color, position FROM labels WHERE id = ?").get(id)
+  broadcastToBoard(row.boardId, { type: "label.upsert", boardId: row.boardId, label, actorId: user.id })
+  return c.json(label)
+})
+
+routes.delete("/labels/:id", (c) => {
+  const { user } = getAuthUser(c)!
+  const id = c.req.param("id")
+  const row = db.query("SELECT id, board_id AS boardId FROM labels WHERE id = ?").get(id) as { id: string; boardId: string } | null
+  if (!row) return c.json({ error: "Not found" }, 404)
+  if (!boardWorkspace(row.boardId, user.id)) return c.json({ error: "Forbidden" }, 403)
+  db.transaction(() => {
+    // Remove the association from every card, then drop the label itself.
+    db.query("DELETE FROM item_labels WHERE label_id = ?").run(id)
+    db.query("DELETE FROM labels WHERE id = ?").run(id)
+  })()
+  broadcastToBoard(row.boardId, { type: "label.delete", boardId: row.boardId, labelId: id, actorId: user.id })
+  return c.json({ ok: true })
+})
+
 // --- Item associations (labels, assignees), comments, checklist ---
 
 routes.put("/items/:id/labels", async (c) => {
@@ -303,11 +342,18 @@ routes.post("/items/:id/comments", async (c) => {
   const text = String(body?.body || "").trim().slice(0, 5000)
   if (!text) return c.json({ error: "Comment is empty" }, 400)
 
+  // Replies nest under an existing comment on the same card.
+  const parentId = body?.parentId ? String(body.parentId) : null
+  if (parentId) {
+    const parent = db.query("SELECT id, item_id AS itemId FROM comments WHERE id = ?").get(parentId) as { id: string; itemId: string } | null
+    if (!parent || parent.itemId !== id) return c.json({ error: "Parent comment not found" }, 400)
+  }
+
   const commentId = newId("cmt")
   const t = now()
   db.transaction(() => {
-    db.query("INSERT INTO comments (id, item_id, author_id, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)")
-      .run(commentId, id, user.id, text, t, t)
+    db.query("INSERT INTO comments (id, item_id, author_id, parent_id, body, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
+      .run(commentId, id, user.id, parentId, text, t, t)
     db.query("UPDATE items SET updated_by = ?, updated_at = ? WHERE id = ?").run(user.id, now(), id)
   })()
   logActivity(id, user.id, "comment")
