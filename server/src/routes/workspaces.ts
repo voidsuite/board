@@ -77,10 +77,18 @@ routes.patch("/workspaces/:id", (c) => c.req.json().then(async (body) => {
   if (!role) return c.json({ error: "Not a member" }, 403)
 
   const patch: string[] = []
-  const values: (string | number)[] = []
+  const values: (string | number | null)[] = []
   if (typeof body?.name === "string" && body.name.trim()) {
     patch.push("name = ?")
     values.push(body.name.trim().slice(0, 100))
+  }
+  if (typeof body?.avatarFileId === "string") {
+    const file = db.query("SELECT id FROM files WHERE id = ? AND workspace_id = ?").get(body.avatarFileId, id)
+    if (!file) return c.json({ error: "Avatar file isn't in this workspace" }, 400)
+    patch.push("avatar_file_id = ?")
+    values.push(body.avatarFileId)
+  } else if (body?.avatarFileId === null) {
+    patch.push("avatar_file_id = NULL")
   }
   if (!patch.length) return c.json(serializeWorkspace(id))
   values.push(now(), id)
@@ -244,9 +252,24 @@ routes.patch("/boards/:id", (c) => c.req.json().then(async (body) => {
   const id = c.req.param("id")
   const ws = boardWorkspace(id, user.id)
   if (!ws) return c.json({ error: "Not found" }, 404)
-  const name = String(body?.name || "").trim().slice(0, 100)
-  if (!name) return c.json({ error: "Name is required" }, 400)
-  db.query("UPDATE boards SET name = ?, updated_at = ? WHERE id = ?").run(name, now(), id)
+
+  const patch: string[] = []
+  const values: (string | number | null)[] = []
+  if (typeof body?.name === "string" && body.name.trim()) {
+    patch.push("name = ?")
+    values.push(body.name.trim().slice(0, 100))
+  }
+  if (typeof body?.avatarFileId === "string") {
+    const file = db.query("SELECT id FROM files WHERE id = ? AND workspace_id = ?").get(body.avatarFileId, ws)
+    if (!file) return c.json({ error: "Avatar file isn't in this workspace" }, 400)
+    patch.push("avatar_file_id = ?")
+    values.push(body.avatarFileId)
+  } else if (body?.avatarFileId === null) {
+    patch.push("avatar_file_id = NULL")
+  }
+  if (!patch.length) return c.json(serializeBoard(id))
+  values.push(now(), id)
+  db.query(`UPDATE boards SET ${patch.join(", ")}, updated_at = ? WHERE id = ?`).run(...values)
   broadcastToWorkspace(ws, { type: "board.upsert", boardId: id, actorId: user.id })
   return c.json(serializeBoard(id))
 }))

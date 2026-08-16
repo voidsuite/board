@@ -39,7 +39,7 @@ const memberRowsStmt = db.query(`
 `)
 
 const workspaceRowStmt = db.query(`
-  SELECT id, name, owner_id AS ownerId, invite_token AS inviteToken,
+  SELECT id, name, avatar_file_id AS avatarFileId, owner_id AS ownerId, invite_token AS inviteToken,
          invite_enabled AS inviteEnabled, created_at AS createdAt, updated_at AS updatedAt
   FROM workspaces WHERE id = ?
 `)
@@ -47,6 +47,7 @@ const workspaceRowStmt = db.query(`
 export interface WorkspaceDto {
   id: string
   name: string
+  avatarFileId: string | null
   ownerId: string
   inviteToken: string | null
   inviteEnabled: boolean
@@ -66,6 +67,7 @@ export function serializeWorkspace(id: string): WorkspaceDto | null {
   const row = workspaceRowStmt.get(id) as {
     id: string
     name: string
+    avatarFileId: string | null
     ownerId: string
     inviteToken: string | null
     inviteEnabled: number
@@ -91,6 +93,7 @@ export function serializeWorkspace(id: string): WorkspaceDto | null {
   return {
     id: row.id,
     name: row.name,
+    avatarFileId: row.avatarFileId,
     ownerId: row.ownerId,
     inviteToken: row.inviteToken,
     inviteEnabled: row.inviteEnabled === 1,
@@ -110,6 +113,7 @@ const projectsStmt = db.query(`
 
 const boardsStmt = db.query(`
   SELECT id, workspace_id AS workspaceId, project_id AS projectId, name, position,
+         avatar_file_id AS avatarFileId,
          created_at AS createdAt, updated_at AS updatedAt
   FROM boards WHERE workspace_id = ? ORDER BY position ASC, created_at ASC
 `)
@@ -129,6 +133,7 @@ export interface BoardDto {
   workspaceId: string
   projectId: string | null
   name: string
+  avatarFileId: string | null
   position: number
   createdAt: number
   updatedAt: number
@@ -144,6 +149,7 @@ export function listBoards(workspaceId: string): BoardDto[] {
     workspaceId: string
     projectId: string | null
     name: string
+    avatarFileId: string | null
     position: number
     createdAt: number
     updatedAt: number
@@ -163,6 +169,7 @@ export function serializeProject(id: string): ProjectDto | null {
 export function serializeBoard(id: string): BoardDto | null {
   const row = db.query(`
     SELECT id, workspace_id AS workspaceId, project_id AS projectId, name, position,
+           avatar_file_id AS avatarFileId,
            created_at AS createdAt, updated_at AS updatedAt
     FROM boards WHERE id = ?
   `).get(id) as {
@@ -170,6 +177,7 @@ export function serializeBoard(id: string): BoardDto | null {
     workspaceId: string
     projectId: string | null
     name: string
+    avatarFileId: string | null
     position: number
     createdAt: number
     updatedAt: number

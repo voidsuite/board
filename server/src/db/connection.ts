@@ -29,6 +29,17 @@ if (!commentCols.some((c) => c.name === "parent_id")) {
 }
 db.exec("CREATE INDEX IF NOT EXISTS idx_comments_parent ON comments(parent_id);")
 
+// Avatar columns for workspaces and boards (same pattern — CREATE TABLE IF
+// NOT EXISTS won't add columns to databases created before they existed).
+const workspaceCols = db.query("PRAGMA table_info(workspaces)").all() as { name: string }[]
+if (!workspaceCols.some((c) => c.name === "avatar_file_id")) {
+  db.exec("ALTER TABLE workspaces ADD COLUMN avatar_file_id TEXT REFERENCES files(id) ON DELETE SET NULL;")
+}
+const boardCols = db.query("PRAGMA table_info(boards)").all() as { name: string }[]
+if (!boardCols.some((c) => c.name === "avatar_file_id")) {
+  db.exec("ALTER TABLE boards ADD COLUMN avatar_file_id TEXT REFERENCES files(id) ON DELETE SET NULL;")
+}
+
 db.exec("PRAGMA optimize;")
 
 export function now(): number {
