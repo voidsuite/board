@@ -160,12 +160,8 @@ export function useBoard(boardId: string): BoardStore {
 
   const updateItem = React.useCallback(
     async (itemId: string, patch: Parameters<BoardStore["updateItem"]>[1]) => {
-      try {
-        const updated = await api.updateItem(itemId, patch)
-        patchItem(updated)
-      } catch (e) {
-        throw e
-      }
+      const updated = await api.updateItem(itemId, patch)
+      patchItem(updated)
     },
     [patchItem]
   )

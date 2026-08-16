@@ -22,6 +22,7 @@ multiplayer workspaces, images and Markdown formatting.
 | Render views | Board (kanban), Table and List views over the same data with filters. |
 | Multiplayer | Optimistic edits + authenticated WebSocket push: peers see card moves, column changes and presence (who's online) live. |
 | Images & markdown | Card covers/attachments (uploads, auth-gated) and Markdown descriptions/comments. |
+| Offline shell | Service worker caches the app shell (never auth/API traffic) — the UI loads instantly and works offline. |
 
 ## Architecture
 
@@ -70,6 +71,10 @@ client pointing at `http://localhost:5177/oauth/callback`.
 ```bash
 docker compose up --build   # builds client + server, serves everything on :3006
 ```
+
+The database and uploads live in the `voidboard-data` named volume, so your boards
+survive container recreates. Point `DATA_DIR` elsewhere if you'd rather keep them
+outside Docker.
 
 ## License
 

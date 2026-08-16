@@ -10,3 +10,9 @@ services:
       - "${PORT:-3006}:3006"
     env_file:
       - .env
+    volumes:
+      # SQLite database + uploads persist across container recreates.
+      - voidboard-data:/app/server/data
+
+volumes:
+  voidboard-data:
