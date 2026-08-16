@@ -161,6 +161,14 @@ export function getWorkspace(id: string): Promise<Workspace> {
   return gateway(`/api/workspaces/${id}`)
 }
 
+export function listProjects(workspaceId: string): Promise<Project[]> {
+  return gateway(`/api/workspaces/${workspaceId}/projects`)
+}
+
+export function listBoards(workspaceId: string): Promise<Board[]> {
+  return gateway(`/api/workspaces/${workspaceId}/boards`)
+}
+
 export function updateMemberRole(workspaceId: string, userId: string, role: WorkspaceMember["role"]): Promise<void> {
   return gateway(`/api/workspaces/${workspaceId}/members/${userId}`, { method: "PATCH", body: JSON.stringify({ role }) })
 }

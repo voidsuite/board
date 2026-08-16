@@ -56,6 +56,20 @@ routes.get("/:id", (c) => {
   return c.json(ws)
 })
 
+routes.get("/:id/projects", (c) => {
+  const { user } = getAuthUser(c)!
+  const id = c.req.param("id")
+  if (!workspaceRole(id, user.id)) return c.json({ error: "Not a member" }, 403)
+  return c.json(listProjects(id))
+})
+
+routes.get("/:id/boards", (c) => {
+  const { user } = getAuthUser(c)!
+  const id = c.req.param("id")
+  if (!workspaceRole(id, user.id)) return c.json({ error: "Not a member" }, 403)
+  return c.json(listBoards(id))
+})
+
 routes.patch("/:id", (c) => c.req.json().then(async (body) => {
   const { user } = getAuthUser(c)!
   const id = c.req.param("id")
