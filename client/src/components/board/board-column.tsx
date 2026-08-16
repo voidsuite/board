@@ -31,6 +31,7 @@ export function BoardColumn({
   onAddCard,
   onDeleteColumn,
   onMenuAction,
+  dragDisabled = false,
 }: {
   column: Column
   items: Item[]
@@ -42,6 +43,8 @@ export function BoardColumn({
   onAddCard: (columnId: string, title: string) => Promise<void>
   onDeleteColumn: (column: Column) => void
   onMenuAction: (action: "rename" | "wip" | "clear-wip", column: Column) => void
+  /** True when filters are active — cards are not draggable then. */
+  dragDisabled?: boolean
 }) {
   const [dragOver, setDragOver] = React.useState(false)
   const [dropIndex, setDropIndex] = React.useState<number | null>(null)
@@ -174,6 +177,7 @@ export function BoardColumn({
                 <ItemCard
                   item={item}
                   onOpen={onOpen}
+                  dragDisabled={dragDisabled}
                   onDragStart={(e) => {
                     e.dataTransfer.setData("text/plain", item.id)
                     e.dataTransfer.effectAllowed = "move"

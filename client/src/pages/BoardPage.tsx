@@ -5,7 +5,7 @@
 
 import * as React from "react"
 import { Link, useParams } from "react-router"
-import { ArrowLeft, LayoutGrid, Loader2, Plus, Wifi, WifiOff } from "lucide-react"
+import { ArrowLeft, LayoutGrid, List, Loader2, Plus, Share2, Table2, Wifi, WifiOff, type LucideIcon } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -17,11 +17,23 @@ import { PromptDialog } from "@/components/prompt-dialog"
 import { ConfirmDialog } from "@/components/confirm-dialog"
 import { BoardColumn, type DragState } from "@/components/board/board-column"
 import { ItemDialog, BoardContext } from "@/components/board/item-dialog"
+import { FilterBar, EMPTY_FILTERS, activeFilterCount, matchesFilters, type BoardFilters } from "@/components/board/filter-bar"
+import { TableView } from "@/components/board/table-view"
+import { ListView } from "@/components/board/list-view"
+import { ShareDialog } from "@/components/share-dialog"
 import { useBoard } from "@/lib/use-board"
 import { useAuth } from "@/contexts/auth"
 import { useToast } from "@/contexts/toast"
 import { cn } from "@/lib/utils"
 import type { Column, Item } from "@/lib/types"
+
+type View = "board" | "table" | "list"
+
+const VIEWS: { id: View; icon: LucideIcon; label: string }[] = [
+  { id: "board", icon: LayoutGrid, label: "Board view" },
+  { id: "table", icon: Table2, label: "Table view" },
+  { id: "list", icon: List, label: "List view" },
+]
 
 interface ColumnMenu {
   action: "rename" | "wip"
@@ -40,8 +52,15 @@ export function BoardPage() {
   const [deletingColumn, setDeletingColumn] = React.useState<Column | null>(null)
   const [createColumnOpen, setCreateColumnOpen] = React.useState(false)
   const [renameBoardOpen, setRenameBoardOpen] = React.useState(false)
+  const [view, setView] = React.useState<View>("board")
+  const [filters, setFilters] = React.useState<BoardFilters>(EMPTY_FILTERS)
+  const [shareOpen, setShareOpen] = React.useState(false)
 
   const openItem = openItemId ? board.item(openItemId) : undefined
+  const filtersActive = activeFilterCount(filters) > 0
+  // Every card across the board, then narrowed by the active filters. The
+  // board view additionally filters per-column; table/list use this flat list.
+  const visibleItems = board.columns.flatMap((c) => board.itemsIn(c.id)).filter((i) => matchesFilters(i, filters))
 
   // Clear the drag state when a native drag ends outside a drop target.
   React.useEffect(() => {
@@ -168,50 +187,97 @@ export function BoardPage() {
           {board.board.name}
         </button>
         <div className="ml-auto flex items-center gap-1.5">
+          {/* View switcher */}
+          <div className="hidden items-center gap-0.5 rounded-lg bg-muted p-0.5 sm:flex" role="group" aria-label="View">
+            {VIEWS.map((v) => {
+              const Icon = v.icon
+              const active = view === v.id
+              return (
+                <button
+                  key={v.id}
+                  type="button"
+                  onClick={() => setView(v.id)}
+                  aria-pressed={active}
+                  title={v.label}
+                  className={cn(
+                    "inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground",
+                    active && "bg-background text-foreground shadow-sm"
+                  )}
+                >
+                  <Icon className="size-3.5" aria-hidden="true" />
+                </button>
+              )
+            })}
+          </div>
+
+          <FilterBar
+            filters={filters}
+            onChange={setFilters}
+            labels={board.labels}
+            members={board.workspace?.members ?? []}
+          />
+
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setShareOpen(true)}>
+            <Share2 className="size-3.5" aria-hidden="true" />
+            Share
+          </Button>
+
           <PresenceBadge state={board.socketState} online={board.presence.filter((p) => p.userId !== user?.id).length} />
           <span className="hidden rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground sm:inline">
-            {board.columns.length} {board.columns.length === 1 ? "column" : "columns"}
+            {visibleItems.length} {visibleItems.length === 1 ? "card" : "cards"}
           </span>
         </div>
       </header>
 
-      {/* Columns */}
+      {/* View body */}
       <BoardContext.Provider value={board}>
-        <div className="vb-board-columns voidboard-scrollbar flex-1 overflow-x-auto overflow-y-hidden px-4 py-4">
-          <div className="flex h-full min-h-full items-start gap-3">
-            {board.columns.map((column) => (
-              <BoardColumn
-                key={column.id}
-                column={column}
-                items={board.itemsIn(column.id)}
-                wipVisible
-                dragState={dragState}
-                onDropCard={dropCard}
-                onItemDragStart={(item, columnId) =>
-                  setDragState({ itemId: item.id, fromColumnId: columnId, sourceIndex: board.itemsIn(columnId).findIndex((i) => i.id === item.id) })
-                }
-                onOpen={(item) => setOpenItemId(item.id)}
-                onAddCard={addCard}
-                onDeleteColumn={(c) => setDeletingColumn(c)}
-                onMenuAction={(action, column) => {
-                  if (action === "clear-wip") {
-                    run(board.setColumnWip(column.id, null), "Couldn't update WIP limit")
-                  } else {
-                    setColumnMenu({ action, column })
-                  }
-                }}
-              />
-            ))}
+        {view === "board" ? (
+          <div className="vb-board-columns voidboard-scrollbar flex-1 overflow-x-auto overflow-y-hidden px-4 py-4">
+            <div className="flex h-full min-h-full items-start gap-3">
+              {board.columns.map((column) => (
+                <BoardColumn
+                  key={column.id}
+                  column={column}
+                  items={board.itemsIn(column.id).filter((i) => matchesFilters(i, filters))}
+                  wipVisible
+                  dragState={filtersActive ? null : dragState}
+                  dragDisabled={filtersActive}
+                  onDropCard={dropCard}
+                  onItemDragStart={(item, columnId) => {
+                    if (filtersActive) return
+                    setDragState({ itemId: item.id, fromColumnId: columnId, sourceIndex: board.itemsIn(columnId).findIndex((i) => i.id === item.id) })
+                  }}
+                  onOpen={(item) => setOpenItemId(item.id)}
+                  onAddCard={addCard}
+                  onDeleteColumn={(c) => setDeletingColumn(c)}
+                  onMenuAction={(action, column) => {
+                    if (action === "clear-wip") {
+                      run(board.setColumnWip(column.id, null), "Couldn't update WIP limit")
+                    } else {
+                      setColumnMenu({ action, column })
+                    }
+                  }}
+                />
+              ))}
 
-            <button
-              onClick={() => setCreateColumnOpen(true)}
-              className="flex h-12 w-72 shrink-0 items-center justify-center gap-2 rounded-xl border border-dashed border-border text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:bg-accent/50 hover:text-foreground"
-            >
-              <Plus className="size-4" aria-hidden="true" />
-              Add column
-            </button>
+              <button
+                onClick={() => setCreateColumnOpen(true)}
+                className="flex h-12 w-72 shrink-0 items-center justify-center gap-2 rounded-xl border border-dashed border-border text-sm text-muted-foreground transition-colors hover:border-primary/50 hover:bg-accent/50 hover:text-foreground"
+              >
+                <Plus className="size-4" aria-hidden="true" />
+                Add column
+              </button>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="voidboard-scrollbar flex-1 overflow-y-auto px-4 py-4">
+            {view === "table" ? (
+              <TableView columns={board.columns} items={visibleItems} onOpen={(item) => setOpenItemId(item.id)} />
+            ) : (
+              <ListView columns={board.columns} items={visibleItems} onOpen={(item) => setOpenItemId(item.id)} />
+            )}
+          </div>
+        )}
 
         {/* Card editor */}
         {openItem ? (
@@ -277,6 +343,9 @@ export function BoardPage() {
         description={`“${deletingColumn?.name ?? ""}” and every card in it will be permanently removed.`}
         onConfirm={deleteColumn}
       />
+
+      {/* Share */}
+      <ShareDialog workspace={board.workspace ?? null} open={shareOpen} onOpenChange={setShareOpen} />
     </div>
   )
 }

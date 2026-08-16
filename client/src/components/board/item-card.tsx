@@ -49,27 +49,33 @@ export function ItemCard({
   onOpen,
   onDragStart,
   onDragEnd,
+  dragDisabled = false,
 }: {
   item: Item
   onOpen: (item: Item) => void
   onDragStart: (e: React.DragEvent, item: Item) => void
   onDragEnd: (e: React.DragEvent) => void
+  /** True when cross-view filters are active — reordering a filtered list would corrupt positions. */
+  dragDisabled?: boolean
 }) {
   const checklist = item.checklists
   const done = checklist.filter((c) => c.done).length
 
   return (
     <div
-      draggable
-      onDragStart={(e) => onDragStart(e, item)}
-      onDragEnd={onDragEnd}
+      draggable={!dragDisabled}
+      onDragStart={dragDisabled ? undefined : (e) => onDragStart(e, item)}
+      onDragEnd={dragDisabled ? undefined : onDragEnd}
       onDoubleClick={() => onOpen(item)}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
         if (e.key === "Enter") onOpen(item)
       }}
-      className="group/card cursor-grab rounded-lg border border-border bg-card p-2.5 shadow-sm transition-all hover:border-foreground/20 hover:shadow-md active:cursor-grabbing select-none"
+      className={cn(
+        "group/card rounded-lg border border-border bg-card p-2.5 shadow-sm transition-all hover:border-foreground/20 hover:shadow-md select-none",
+        dragDisabled ? "cursor-default" : "cursor-grab active:cursor-grabbing"
+      )}
     >
       {item.coverFileId ? (
         <img
