@@ -14,10 +14,11 @@ export default defineConfig({
   server: {
     port: 5177,
     proxy: {
-      // In dev, forward API calls to the bun gateway server.
+      // In dev, forward API + WebSocket (realtime) calls to the bun gateway.
       '/api': {
         target: process.env.VITE_DEV_PROXY || 'http://localhost:3006',
         changeOrigin: true,
+        ws: true,
       },
     },
   },
