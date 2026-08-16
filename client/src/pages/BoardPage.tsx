@@ -5,7 +5,8 @@
 
 import * as React from "react"
 import { Link, useParams } from "react-router"
-import { ArrowLeft, LayoutGrid, Loader2, Plus } from "lucide-react"
+import { ArrowLeft, LayoutGrid, Loader2, Plus, Wifi, WifiOff } from "lucide-react"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -17,6 +18,7 @@ import { ConfirmDialog } from "@/components/confirm-dialog"
 import { BoardColumn, type DragState } from "@/components/board/board-column"
 import { ItemDialog, BoardContext } from "@/components/board/item-dialog"
 import { useBoard } from "@/lib/use-board"
+import { useAuth } from "@/contexts/auth"
 import { useToast } from "@/contexts/toast"
 import { cn } from "@/lib/utils"
 import type { Column, Item } from "@/lib/types"
@@ -29,6 +31,7 @@ interface ColumnMenu {
 export function BoardPage() {
   const { boardId = "" } = useParams()
   const board = useBoard(boardId)
+  const { user } = useAuth()
   const { toast } = useToast()
 
   const [dragState, setDragState] = React.useState<DragState | null>(null)
@@ -165,6 +168,7 @@ export function BoardPage() {
           {board.board.name}
         </button>
         <div className="ml-auto flex items-center gap-1.5">
+          <PresenceBadge state={board.socketState} online={board.presence.filter((p) => p.userId !== user?.id).length} />
           <span className="hidden rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground sm:inline">
             {board.columns.length} {board.columns.length === 1 ? "column" : "columns"}
           </span>
@@ -277,7 +281,40 @@ export function BoardPage() {
   )
 }
 
-/** A direct fetch helper for board rename (kept local to the page). */
+/** Live-connection + online-members indicator shown in the board header. */
+function PresenceBadge({ state, online }: { state: "connecting" | "open" | "offline"; online: number }) {
+  const offline = state === "offline"
+  const connecting = state === "connecting"
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground">
+            <span className="relative flex size-2" aria-hidden="true">
+              <span className={cn(
+                "absolute inline-flex size-full rounded-full",
+                offline ? "bg-destructive/60" : "bg-emerald-500/60",
+                !offline && "animate-ping opacity-75"
+              )} />
+              <span className={cn("relative inline-flex size-2 rounded-full", offline ? "bg-destructive" : connecting ? "bg-amber-500" : "bg-emerald-500")} />
+            </span>
+            {offline ? <WifiOff className="size-3" /> : connecting ? <Loader2 className="size-3 animate-spin" /> : <Wifi className="size-3" />}
+            {online > 0 ? `${online} online` : offline ? "offline" : "live"}
+          </span>
+        }
+      />
+      <TooltipContent>
+        {offline
+          ? "Reconnecting… changes will sync when you're back online"
+          : connecting
+            ? "Connecting…"
+            : `${online} ${online === 1 ? "person is" : "people are"} viewing this board right now`}
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
+/** WIP limit editor dialog (numeric, empty = unlimited). */
 function WipDialog({
   open,
   column,

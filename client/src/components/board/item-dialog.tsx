@@ -236,6 +236,15 @@ export function ItemDialog({
     }
   }, [open, item.id])
 
+  // Multiplayer: announce which card you're viewing.
+  React.useEffect(() => {
+    if (!open) return
+    board.sendCursor(item.id)
+    return () => board.sendCursor(null)
+  }, [open, item.id, board])
+
+  const viewersHere = board.viewers.filter((v) => v.itemId === item.id)
+
   const members: WorkspaceMember[] = board.workspace?.members ?? []
   const assigneeIds = new Set(item.assignees.map((a) => a.id))
 
@@ -492,6 +501,19 @@ export function ItemDialog({
 
           {/* Footer */}
           <div className="flex items-center gap-3 border-t border-border px-5 py-3">
+            {viewersHere.length > 0 ? (
+              <span className="flex items-center gap-1">
+                <span className="flex -space-x-1.5 *:ring-2 *:ring-background">
+                  {viewersHere.slice(0, 3).map((v) => (
+                    <Avatar key={v.userId} size="sm">
+                      <AvatarImage src={v.picture || undefined} alt={v.name} />
+                      <AvatarFallback className="text-[8px]">{initials(v.name)}</AvatarFallback>
+                    </Avatar>
+                  ))}
+                </span>
+                <span className="text-[11px] text-muted-foreground">viewing</span>
+              </span>
+            ) : null}
             <p className="min-w-0 flex-1 truncate text-[11px] text-muted-foreground">
               Created {timeAgo(item.createdAt)} by {item.createdBy.name} · updated {timeAgo(item.updatedAt)}
             </p>

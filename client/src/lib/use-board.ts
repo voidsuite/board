@@ -9,8 +9,16 @@
 import * as React from "react"
 import * as api from "@/lib/api"
 import type {
-  Board, BoardDocument, Column, Item, Label, WsEvent, Workspace,
+  Board, BoardDocument, Column, Item, Label, PresenceMember, WsEvent, Workspace,
 } from "@/lib/types"
+
+export interface CursorUser {
+  userId: string
+  name: string
+  picture?: string | null
+  itemId: string | null
+  lastSeen: number
+}
 
 export interface BoardStore {
   status: "loading" | "ready" | "error"
@@ -23,6 +31,13 @@ export interface BoardStore {
   itemsIn: (columnId: string) => Item[]
   item: (id: string) => Item | undefined
   reload: () => void
+  /** Silent catch-up refetch — used on realtime reconnects. */
+  refresh: () => void
+  // realtime
+  socketState: "connecting" | "open" | "offline"
+  presence: PresenceMember[]
+  viewers: CursorUser[]
+  sendCursor: (itemId: string | null) => void
   // board ops
   createColumn: (name: string) => Promise<void>
   renameColumn: (columnId: string, name: string) => Promise<void>
@@ -55,23 +70,45 @@ export function useBoard(boardId: string): BoardStore {
   const [columns, setColumns] = React.useState<Column[]>([])
   const [items, setItems] = React.useState<Record<string, Item>>({})
 
+  const applyDocument = React.useCallback(
+    (doc: BoardDocument) => {
+      setBoard(doc.board)
+      setWorkspace(doc.workspace)
+      setColumns(doc.columns)
+      setItems(Object.fromEntries(doc.items.map((i) => [i.id, i])))
+    },
+    []
+  )
+
+  const loadDocument = React.useCallback(
+    (silent = false) => {
+      if (!silent) {
+        setStatus("loading")
+        setError(null)
+      }
+      api
+        .getBoardDocument(boardId)
+        .then((doc: BoardDocument) => {
+          applyDocument(doc)
+          setStatus("ready")
+        })
+        .catch((e: unknown) => {
+          if (!silent) {
+            setError(e instanceof Error ? e.message : "Couldn't load this board")
+            setStatus("error")
+          }
+        })
+    },
+    [boardId, applyDocument]
+  )
+
   const reload = React.useCallback(() => {
-    setStatus("loading")
-    setError(null)
-    api
-      .getBoardDocument(boardId)
-      .then((doc: BoardDocument) => {
-        setBoard(doc.board)
-        setWorkspace(doc.workspace)
-        setColumns(doc.columns)
-        setItems(Object.fromEntries(doc.items.map((i) => [i.id, i])))
-        setStatus("ready")
-      })
-      .catch((e: unknown) => {
-        setError(e instanceof Error ? e.message : "Couldn't load this board")
-        setStatus("error")
-      })
-  }, [boardId])
+    loadDocument(false)
+  }, [loadDocument])
+
+  const refresh = React.useCallback(() => {
+    loadDocument(true)
+  }, [loadDocument])
 
   React.useEffect(() => {
     reload()
@@ -301,7 +338,18 @@ export function useBoard(boardId: string): BoardStore {
 
   const getLabel = React.useCallback((id: string): Label | undefined => labels.find((l) => l.id === id), [labels])
 
-  // --- realtime reconciliation (phase 5) ---
+  // --- realtime (phase 5): socket, presence, cursors ---
+
+  const [socketState, setSocketState] = React.useState<BoardStore["socketState"]>("connecting")
+  const [presence, setPresence] = React.useState<PresenceMember[]>([])
+  const [viewers, setViewers] = React.useState<CursorUser[]>([])
+
+  const socketRef = React.useRef<WebSocket | null>(null)
+  const retryRef = React.useRef(0)
+  const timerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+  const meRef = React.useRef<string | null>(null)
+
+  // --- realtime event reconciliation (idempotent, apply-first) ---
 
   const applyEvent = React.useCallback(
     (ev: WsEvent) => {
@@ -337,8 +385,92 @@ export function useBoard(boardId: string): BoardStore {
     [patchItem]
   )
 
+  const pruneViewers = React.useCallback(() => {
+    setViewers((prev) => prev.filter((v) => Date.now() - v.lastSeen < 15000))
+  }, [])
+
+  const connect = React.useCallback(() => {
+    if (socketRef.current && socketRef.current.readyState <= WebSocket.OPEN) return
+    let ws: WebSocket
+    try {
+      ws = api.openBoardSocket(boardId)
+    } catch {
+      const delay = Math.min(1000 * 2 ** retryRef.current, 15000)
+      retryRef.current += 1
+      timerRef.current = setTimeout(connect, delay)
+      return
+    }
+    socketRef.current = ws
+    setSocketState("connecting")
+
+    ws.onopen = () => {
+      setSocketState("open")
+      meRef.current = null
+      // Catch up on anything missed while disconnected.
+      if (retryRef.current > 0) refresh()
+      retryRef.current = 0
+    }
+
+    ws.onmessage = (e) => {
+      let ev: WsEvent
+      try {
+        ev = JSON.parse(String(e.data)) as WsEvent
+      } catch {
+        return
+      }
+      if (ev.type === "presence") {
+        const members = (Array.isArray(ev.members) ? ev.members : []) as unknown as PresenceMember[]
+        setPresence(members)
+        const self = members.find((m) => m.userId === (meRef.current ?? undefined))
+        if (self) meRef.current = self.userId
+      } else if (ev.type === "cursor") {
+        if (ev.userId === meRef.current) return
+        const userId = String(ev.userId ?? "")
+        if (!userId) return
+        const itemId = typeof ev.itemId === "string" ? ev.itemId : null
+        setViewers((prev) => [
+          ...prev.filter((v) => v.userId !== userId),
+          { userId, name: String(ev.userName ?? "Someone"), picture: (ev as { userPicture?: string | null }).userPicture ?? null, itemId, lastSeen: Date.now() },
+        ])
+      } else {
+        applyEvent(ev)
+      }
+    }
+
+    ws.onerror = () => {
+      ws.close()
+    }
+
+    ws.onclose = () => {
+      if (socketRef.current === ws) socketRef.current = null
+      setSocketState("offline")
+      const delay = Math.min(1000 * 2 ** retryRef.current, 15000)
+      retryRef.current += 1
+      timerRef.current = setTimeout(connect, delay)
+    }
+  }, [boardId, applyEvent, refresh])
+
+  React.useEffect(() => {
+    connect()
+    pruneViewers()
+    const prune = setInterval(pruneViewers, 10000)
+    return () => {
+      clearInterval(prune)
+      if (timerRef.current) clearTimeout(timerRef.current)
+      socketRef.current?.close(1000, "unmount")
+      socketRef.current = null
+    }
+  }, [connect, pruneViewers])
+
+  const sendCursor = React.useCallback((itemId: string | null) => {
+    const ws = socketRef.current
+    if (!ws || ws.readyState !== WebSocket.OPEN) return
+    ws.send(JSON.stringify({ type: "cursor", itemId }))
+  }, [])
+
   return {
-    status, error, board, workspace, columns, labels, getLabel, itemsIn, item, reload,
+    status, error, board, workspace, columns, labels, getLabel, itemsIn, item, reload, refresh,
+    socketState, presence, viewers, sendCursor,
     createColumn, renameColumn, setColumnWip, deleteColumn, renameBoard,
     createItem, updateItem, moveItem, deleteItem,
     createLabel, setItemLabels, setItemAssignees,
