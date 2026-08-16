@@ -17,7 +17,7 @@ function start(name: string, cwd: string, args: string[]) {
   procs.push({ p, name })
   p.exited.then((code) => {
     if (code !== 0) {
-      console.error(`\n[voidboard] ${name} exited with code ${code}`)
+      console.error(`\n[board] ${name} exited with code ${code}`)
       shutdown()
     }
   })
@@ -30,7 +30,7 @@ function shutdown() {
     } catch {
       /* already gone */
     }
-    console.log(`[voidboard] stopped ${name}`)
+    console.log(`[board] stopped ${name}`)
   }
   process.exit(0)
 }
@@ -41,4 +41,4 @@ process.on("SIGTERM", shutdown)
 start("client", "client", ["--env-file=../.env", "run", "dev"])
 start("server", "server", ["--env-file=../.env", "run", "start"])
 
-console.log("[voidboard] client → http://localhost:5177 · gateway → http://localhost:3006")
+console.log("[board] client → http://localhost:5177 · gateway → http://localhost:3006")

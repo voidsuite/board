@@ -1,4 +1,4 @@
-# voidboard — Void Board
+# board — Void Board
 
 **Kanban project boards for the VoidSuite family.** Sign in with **VoidAuth** once and your
 boards sync automatically to any device — no passphrase, nothing to enter. Trello-style boards
@@ -72,10 +72,10 @@ client pointing at `http://localhost:5177/oauth/callback`.
 docker compose up --build   # builds client + server, serves everything on :3006
 ```
 
-The database and uploads live in the `voidboard-data` named volume, so your boards
+The database and uploads live in the `board-data` named volume, so your boards
 survive container recreates. Point `DATA_DIR` elsewhere if you'd rather keep them
 outside Docker.
 
 ## License
 
-MIT — see [LICENSE](LICENSE). voidboard is part of the **VoidSuite** app family.
+MIT — see [LICENSE](LICENSE). board is part of the **VoidSuite** app family.

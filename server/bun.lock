@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "voidboard-server",
+      "name": "board-server",
       "dependencies": {
         "@voidauth/client": "^1.0.3",
         "hono": "^4.9.0",

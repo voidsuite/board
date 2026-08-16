@@ -1,5 +1,5 @@
 /**
- * voidboard gateway — serves the built client (client/dist) plus the API:
+ * board gateway — serves the built client (client/dist) plus the API:
  *   /api/auth/*    VoidAuth OAuth proxy (PKCE, httpOnly session cookie)
  *   /api/workspaces|projects|boards|columns|items|labels|files — REST API
  *   /api/ws        Realtime (server-authoritative event push + presence)
@@ -39,7 +39,7 @@ app.route("/api", workspaceRoutes)
 app.route("/api", boardRoutes)
 app.route("/api/files", fileRoutes)
 
-app.get("/health", (c) => c.json({ status: "ok", service: "voidboard" }))
+app.get("/health", (c) => c.json({ status: "ok", service: "board" }))
 
 // Static client + SPA fallback
 const MIME_TYPES: Record<string, string> = {
@@ -84,7 +84,7 @@ app.get("*", async (c) => {
   return c.json({ error: "Not found" }, 404)
 })
 
-console.log(`[voidboard] gateway starting on :${config.port} (${config.appUrl})`)
+console.log(`[board] gateway starting on :${config.port} (${config.appUrl})`)
 
 export default {
   port: config.port,
