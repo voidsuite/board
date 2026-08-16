@@ -34,8 +34,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = React.useState<AuthStatus>("loading")
   const [user, setUser] = React.useState<User | null>(null)
 
-  // Restore an existing session on load.
+  // Restore an existing session on load. The OAuth callback route exchanges
+  // the code itself, so don't probe /api/auth/me there — it would 401 (plus a
+  // /api/auth/refresh retry) before the exchange completes.
   React.useEffect(() => {
+    if (window.location.pathname.startsWith("/oauth/callback")) {
+      setStatus("ready")
+      return
+    }
     let cancelled = false
     api
       .getMe()

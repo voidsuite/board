@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react"
-import { AlertCircle, Loader2 } from "lucide-react"
+import { useNavigate } from "react-router"
+import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { VoidBoardLogo } from "@/components/VoidBoardLogo"
 import { useAuth } from "@/contexts/auth"
@@ -16,6 +17,7 @@ import { useToast } from "@/contexts/toast"
 export function OAuthCallback() {
   const { completeCallback } = useAuth()
   const { toast } = useToast()
+  const navigate = useNavigate()
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
   const startedRef = useRef(false)
@@ -26,13 +28,15 @@ export function OAuthCallback() {
     completeCallback()
       .then(() => {
         setDone(true)
-        window.history.replaceState({}, "", "/")
+        // Navigate for real — replaceState only rewrites the URL bar, which
+        // left the router stuck on this page showing the spinner forever.
+        navigate("/", { replace: true })
         toast({ title: "Signed in", description: "Your boards are ready.", variant: "success" })
       })
       .catch((err: unknown) => {
         setError(err instanceof Error ? err.message : "Sign-in failed")
       })
-  }, [completeCallback, done, toast])
+  }, [completeCallback, done, navigate, toast])
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center px-4">
@@ -50,6 +54,11 @@ export function OAuthCallback() {
             <Button className="w-full" variant="outline" onClick={() => (window.location.href = "/")}>
               Try again
             </Button>
+          </div>
+        ) : done ? (
+          <div className="space-y-3">
+            <CheckCircle2 className="mx-auto size-6 text-emerald-500" aria-hidden="true" />
+            <p className="text-sm text-muted-foreground">Signed in — taking you to your boards…</p>
           </div>
         ) : (
           <div className="space-y-3">
