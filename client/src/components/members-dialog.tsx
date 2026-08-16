@@ -116,7 +116,7 @@ export function MembersDialog({
   onOpenChange,
   onChanged,
 }: {
-  workspace: Workspace
+  workspace: Workspace | null
   open: boolean
   onOpenChange: (open: boolean) => void
   onChanged: (ws: Workspace) => void
@@ -125,6 +125,10 @@ export function MembersDialog({
   const { toast } = useToast()
   const [copied, setCopied] = React.useState(false)
   const [removing, setRemoving] = React.useState<WorkspaceMember | null>(null)
+
+  // The dialog mounts even while the workspace is still loading — do nothing
+  // until there's real data (avoids reading .members of null).
+  if (!workspace) return null
 
   const myRole = workspace.members.find((m) => m.userId === user?.id)?.role ?? "member"
   const canManage = myRole === "owner" || myRole === "admin"

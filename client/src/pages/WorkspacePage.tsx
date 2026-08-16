@@ -391,10 +391,10 @@ export function WorkspacePage() {
       )}
 
       <MembersDialog
-        workspace={workspace as Workspace}
+        workspace={workspace}
         open={membersOpen && !!workspace}
         onOpenChange={setMembersOpen}
-        onChanged={(ws) => setWorkspace(ws)}
+        onChanged={setWorkspace}
       />
 
       {/* Create project */}
