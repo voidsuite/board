@@ -10,6 +10,9 @@ import { Button } from "@/components/ui/button"
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger,
+} from "@/components/ui/context-menu"
 import { ItemCard } from "@/components/board/item-card"
 import { cn } from "@/lib/utils"
 import type { Column, Item } from "@/lib/types"
@@ -30,6 +33,7 @@ export function BoardColumn({
   onOpen,
   onAddCard,
   onDeleteColumn,
+  onDeleteItem,
   onMenuAction,
   dragDisabled = false,
 }: {
@@ -42,6 +46,7 @@ export function BoardColumn({
   onOpen: (item: Item) => void
   onAddCard: (columnId: string, title: string) => Promise<void>
   onDeleteColumn: (column: Column) => void
+  onDeleteItem: (item: Item) => void
   onMenuAction: (action: "rename" | "wip" | "clear-wip", column: Column) => void
   /** True when filters are active — cards are not draggable then. */
   dragDisabled?: boolean
@@ -106,17 +111,20 @@ export function BoardColumn({
   }
 
   return (
-    <section
-      data-slot="vb-column"
-      className={cn(
-        "vb-column w-72 shrink-0 rounded-xl border border-border bg-muted/40",
-        isSource && dragState && "opacity-90",
-        dragOver && "vb-drag-over border-primary/60 bg-primary/5"
-      )}
-      onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
-      onDrop={onDrop}
-    >
+    <ContextMenu>
+      <ContextMenuTrigger
+        render={
+          <section
+            data-slot="vb-column"
+            className={cn(
+              "vb-column w-72 shrink-0 rounded-xl border border-border bg-muted/40",
+              isSource && dragState && "opacity-90",
+              dragOver && "vb-drag-over border-primary/60 bg-primary/5"
+            )}
+            onDragOver={onDragOver}
+            onDragLeave={onDragLeave}
+            onDrop={onDrop}
+          >
       {/* Header */}
       <header className="flex items-center gap-2 px-3 py-2.5">
         <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -174,20 +182,31 @@ export function BoardColumn({
             {items.map((item, i) => (
               <React.Fragment key={item.id}>
                 {dropIndex === i && dragOver ? <DropLine /> : null}
-                <ItemCard
-                  item={item}
-                  onOpen={onOpen}
-                  dragDisabled={dragDisabled}
-                  onDragStart={(e) => {
-                    e.dataTransfer.setData("text/plain", item.id)
-                    e.dataTransfer.effectAllowed = "move"
-                    onItemDragStart(item, column.id)
-                  }}
-                  onDragEnd={() => {
-                    setDragOver(false)
-                    setDropIndex(null)
-                  }}
-                />
+                <ContextMenu>
+                  <ContextMenuTrigger
+                    render={
+                      <ItemCard
+                        item={item}
+                        onOpen={onOpen}
+                        dragDisabled={dragDisabled}
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData("text/plain", item.id)
+                          e.dataTransfer.effectAllowed = "move"
+                          onItemDragStart(item, column.id)
+                        }}
+                        onDragEnd={() => {
+                          setDragOver(false)
+                          setDropIndex(null)
+                        }}
+                      />
+                    }
+                  />
+                  <ContextMenuContent className="w-40">
+                    <ContextMenuItem onSelect={() => onOpen(item)}>Open card</ContextMenuItem>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem variant="destructive" onSelect={() => onDeleteItem(item)}>Delete card</ContextMenuItem>
+                  </ContextMenuContent>
+                </ContextMenu>
               </React.Fragment>
             ))}
             {dropIndex === items.length && dragOver ? <DropLine /> : null}
@@ -234,7 +253,27 @@ export function BoardColumn({
           </button>
         )}
       </footer>
-    </section>
+          </section>
+        }
+      />
+      <ContextMenuContent className="w-44">
+        <ContextMenuItem onSelect={() => onMenuAction("rename", column)}>
+          Rename column
+        </ContextMenuItem>
+        <ContextMenuItem onSelect={() => onMenuAction("wip", column)}>
+          {column.wipLimit !== null ? "Change WIP limit" : "Set WIP limit"}
+        </ContextMenuItem>
+        {column.wipLimit !== null ? (
+          <ContextMenuItem onSelect={() => onMenuAction("clear-wip", column)}>
+            Remove WIP limit
+          </ContextMenuItem>
+        ) : null}
+        <ContextMenuSeparator />
+        <ContextMenuItem variant="destructive" onSelect={() => onDeleteColumn(column)}>
+          Delete column
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   )
 }
 

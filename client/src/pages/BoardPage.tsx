@@ -50,6 +50,7 @@ export function BoardPage() {
   const [openItemId, setOpenItemId] = React.useState<string | null>(null)
   const [columnMenu, setColumnMenu] = React.useState<ColumnMenu | null>(null)
   const [deletingColumn, setDeletingColumn] = React.useState<Column | null>(null)
+  const [deletingItem, setDeletingItem] = React.useState<Item | null>(null)
   const [createColumnOpen, setCreateColumnOpen] = React.useState(false)
   const [renameBoardOpen, setRenameBoardOpen] = React.useState(false)
   const [view, setView] = React.useState<View>("board")
@@ -137,6 +138,7 @@ export function BoardPage() {
     } catch (e) {
       toast({ title: "Couldn't delete card", description: e instanceof Error ? e.message : undefined, variant: "destructive" })
     }
+    setDeletingItem(null)
   }
 
   // --- states ---
@@ -233,6 +235,19 @@ export function BoardPage() {
       <BoardContext.Provider value={board}>
         {view === "board" ? (
           <div className="vb-board-columns voidboard-scrollbar flex-1 overflow-x-auto overflow-y-hidden px-4 py-4">
+            {board.columns.length === 0 ? (
+              <div className="flex h-full min-h-full items-center justify-center">
+                <div className="text-center">
+                  <LayoutGrid className="mx-auto size-8 text-muted-foreground/40" aria-hidden="true" />
+                  <p className="mt-3 font-medium">This board is empty</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Add a column to start organizing cards.</p>
+                  <Button className="mt-4" size="sm" onClick={() => setCreateColumnOpen(true)}>
+                    <Plus className="size-3.5" />
+                    Add column
+                  </Button>
+                </div>
+              </div>
+            ) : (
             <div className="flex h-full min-h-full items-start gap-3">
               {board.columns.map((column) => (
                 <BoardColumn
@@ -250,6 +265,7 @@ export function BoardPage() {
                   onOpen={(item) => setOpenItemId(item.id)}
                   onAddCard={addCard}
                   onDeleteColumn={(c) => setDeletingColumn(c)}
+                  onDeleteItem={(item) => setDeletingItem(item)}
                   onMenuAction={(action, column) => {
                     if (action === "clear-wip") {
                       run(board.setColumnWip(column.id, null), "Couldn't update WIP limit")
@@ -268,6 +284,7 @@ export function BoardPage() {
                 Add column
               </button>
             </div>
+            )}
           </div>
         ) : (
           <div className="voidboard-scrollbar flex-1 overflow-y-auto px-4 py-4">
@@ -342,6 +359,16 @@ export function BoardPage() {
         title="Delete this column?"
         description={`“${deletingColumn?.name ?? ""}” and every card in it will be permanently removed.`}
         onConfirm={deleteColumn}
+      />
+
+      {/* Delete card (context menu) */}
+      <ConfirmDialog
+        open={deletingItem !== null}
+        onOpenChange={(o) => { if (!o) setDeletingItem(null) }}
+        title="Delete this card?"
+        description={`“${deletingItem?.title ?? ""}” will be permanently removed.`}
+        confirmLabel="Delete card"
+        onConfirm={() => { if (deletingItem) void deleteItem(deletingItem) }}
       />
 
       {/* Share */}

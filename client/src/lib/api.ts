@@ -270,6 +270,14 @@ export function createLabel(boardId: string, name: string, color: string): Promi
   return gateway("/api/labels", { method: "POST", body: JSON.stringify({ boardId, name, color }) })
 }
 
+export function updateLabel(id: string, patch: { name?: string; color?: string }): Promise<Label> {
+  return gateway(`/api/labels/${id}`, { method: "PATCH", body: JSON.stringify(patch) })
+}
+
+export function deleteLabel(id: string): Promise<void> {
+  return gateway(`/api/labels/${id}`, { method: "DELETE" })
+}
+
 export function setItemLabels(itemId: string, labelIds: string[]): Promise<Item> {
   return gateway(`/api/items/${itemId}/labels`, { method: "PUT", body: JSON.stringify({ labelIds }) })
 }
@@ -278,8 +286,8 @@ export function setItemAssignees(itemId: string, userIds: string[]): Promise<Ite
   return gateway(`/api/items/${itemId}/assignees`, { method: "PUT", body: JSON.stringify({ userIds }) })
 }
 
-export function addComment(itemId: string, body: string): Promise<Item> {
-  return gateway(`/api/items/${itemId}/comments`, { method: "POST", body: JSON.stringify({ body }) })
+export function addComment(itemId: string, body: string, parentId?: string | null): Promise<Item> {
+  return gateway(`/api/items/${itemId}/comments`, { method: "POST", body: JSON.stringify({ body, parentId: parentId ?? null }) })
 }
 
 export function addChecklistEntry(itemId: string, text: string): Promise<Item> {

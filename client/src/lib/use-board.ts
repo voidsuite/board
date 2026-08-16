@@ -51,9 +51,11 @@ export interface BoardStore {
   deleteItem: (itemId: string) => Promise<void>
   // associations
   createLabel: (name: string, color: string) => Promise<void>
+  updateLabel: (labelId: string, patch: { name?: string; color?: string }) => Promise<void>
+  deleteLabel: (labelId: string) => Promise<void>
   setItemLabels: (itemId: string, labelIds: string[]) => Promise<void>
   setItemAssignees: (itemId: string, userIds: string[]) => Promise<void>
-  addComment: (itemId: string, body: string) => Promise<void>
+  addComment: (itemId: string, body: string, parentId?: string | null) => Promise<void>
   addChecklistEntry: (itemId: string, text: string) => Promise<void>
   setChecklistEntry: (itemId: string, entryId: string, text: string, done: boolean) => Promise<void>
   deleteChecklistEntry: (itemId: string, entryId: string) => Promise<void>
@@ -69,6 +71,8 @@ export function useBoard(boardId: string): BoardStore {
   const [workspace, setWorkspace] = React.useState<Workspace | null>(null)
   const [columns, setColumns] = React.useState<Column[]>([])
   const [items, setItems] = React.useState<Record<string, Item>>({})
+  // Labels registry — includes labels created but not yet on any card.
+  const [labels, setLabels] = React.useState<Label[]>([])
 
   const applyDocument = React.useCallback(
     (doc: BoardDocument) => {
@@ -257,6 +261,62 @@ export function useBoard(boardId: string): BoardStore {
     [boardId]
   )
 
+  const updateLabel = React.useCallback(
+    async (labelId: string, patch: { name?: string; color?: string }) => {
+      // Optimistically apply the rename/recolor everywhere it appears.
+      const beforeLabels = labels
+      const beforeItems = items
+      const apply = (updated: Label) => {
+        setLabels((prev) => (prev.some((l) => l.id === updated.id) ? prev.map((l) => (l.id === updated.id ? updated : l)) : prev))
+        setItems((prev) => {
+          const next = { ...prev }
+          for (const [k, v] of Object.entries(next)) {
+            if (v.labels.some((l) => l.id === updated.id)) {
+              next[k] = { ...v, labels: v.labels.map((l) => (l.id === updated.id ? updated : l)) }
+            }
+          }
+          return next
+        })
+      }
+      const target = labels.find((l) => l.id === labelId)
+      if (target) apply({ ...target, ...patch })
+      try {
+        apply(await api.updateLabel(labelId, patch))
+      } catch (e) {
+        setLabels(beforeLabels)
+        setItems(beforeItems)
+        throw e
+      }
+    },
+    [labels, items]
+  )
+
+  const deleteLabel = React.useCallback(
+    async (labelId: string) => {
+      const beforeLabels = labels
+      const beforeItems = items
+      // Strip the label from the registry and from every card that had it.
+      setLabels((prev) => prev.filter((l) => l.id !== labelId))
+      setItems((prev) => {
+        const next = { ...prev }
+        for (const [k, v] of Object.entries(next)) {
+          if (v.labels.some((l) => l.id === labelId)) {
+            next[k] = { ...v, labels: v.labels.filter((l) => l.id !== labelId) }
+          }
+        }
+        return next
+      })
+      try {
+        await api.deleteLabel(labelId)
+      } catch (e) {
+        setLabels(beforeLabels)
+        setItems(beforeItems)
+        throw e
+      }
+    },
+    [labels, items]
+  )
+
   const setItemLabels = React.useCallback(
     async (itemId: string, labelIds: string[]) => {
       const updated = await api.setItemLabels(itemId, labelIds)
@@ -274,8 +334,8 @@ export function useBoard(boardId: string): BoardStore {
   )
 
   const addComment = React.useCallback(
-    async (itemId: string, body: string) => {
-      const updated = await api.addComment(itemId, body)
+    async (itemId: string, body: string, parentId?: string | null) => {
+      const updated = await api.addComment(itemId, body, parentId ?? null)
       patchItem(updated)
     },
     [patchItem]
@@ -316,8 +376,6 @@ export function useBoard(boardId: string): BoardStore {
   )
 
   // --- labels registry (union of labels on items + newly created) ---
-
-  const [labels, setLabels] = React.useState<Label[]>([])
 
   React.useEffect(() => {
     const union = new Map<string, Label>()
@@ -372,6 +430,18 @@ export function useBoard(boardId: string): BoardStore {
       } else if (type === "label.upsert" && ev.label) {
         const label = ev.label as Label
         setLabels((prev) => (prev.some((l) => l.id === label.id) ? prev.map((l) => (l.id === label.id ? label : l)) : [...prev, label]))
+      } else if (type === "label.delete" && ev.labelId) {
+        const labelId = ev.labelId as string
+        setLabels((prev) => prev.filter((l) => l.id !== labelId))
+        setItems((prev) => {
+          const next = { ...prev }
+          for (const [k, v] of Object.entries(next)) {
+            if (v.labels.some((l) => l.id === labelId)) {
+              next[k] = { ...v, labels: v.labels.filter((l) => l.id !== labelId) }
+            }
+          }
+          return next
+        })
       } else if (type === "board.delete") {
         // The board is gone — surface it to the page.
         setStatus("error")
@@ -469,7 +539,7 @@ export function useBoard(boardId: string): BoardStore {
     socketState, presence, viewers, sendCursor,
     createColumn, renameColumn, setColumnWip, deleteColumn, renameBoard,
     createItem, updateItem, moveItem, deleteItem,
-    createLabel, setItemLabels, setItemAssignees,
+    createLabel, updateLabel, deleteLabel, setItemLabels, setItemAssignees,
     addComment, addChecklistEntry, setChecklistEntry, deleteChecklistEntry,
     uploadCover, applyEvent,
   }

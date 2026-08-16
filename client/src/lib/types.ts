@@ -83,6 +83,8 @@ export interface ChecklistEntry {
 export interface Comment {
   id: string
   itemId: string
+  /** null = top-level comment; otherwise the comment this is a reply to. */
+  parentId: string | null
   author: UserSummary
   body: string
   createdAt: number
