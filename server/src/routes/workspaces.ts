@@ -24,14 +24,14 @@ const listForUserStmt = db.query(`
   WHERE wm.user_id = ? ORDER BY w.updated_at DESC
 `)
 
-routes.get("/", (c) => {
+routes.get("/workspaces", (c) => {
   const { user } = getAuthUser(c)!
   const rows = listForUserStmt.all(user.id) as { id: string }[]
   const workspaces = rows.map((r) => serializeWorkspace(r.id)).filter(Boolean)
   return c.json(workspaces)
 })
 
-routes.post("/", (c) => c.req.json().then(async (body) => {
+routes.post("/workspaces", (c) => c.req.json().then(async (body) => {
   const { user } = getAuthUser(c)!
   const name = String(body?.name || "").trim().slice(0, 100)
   if (!name) return c.json({ error: "Name is required" }, 400)
@@ -47,7 +47,7 @@ routes.post("/", (c) => c.req.json().then(async (body) => {
   return c.json(serializeWorkspace(id), 201)
 }))
 
-routes.get("/:id", (c) => {
+routes.get("/workspaces/:id", (c) => {
   const { user } = getAuthUser(c)!
   const id = c.req.param("id")
   if (!workspaceRole(id, user.id)) return c.json({ error: "Not a member" }, 403)
@@ -56,21 +56,21 @@ routes.get("/:id", (c) => {
   return c.json(ws)
 })
 
-routes.get("/:id/projects", (c) => {
+routes.get("/workspaces/:id/projects", (c) => {
   const { user } = getAuthUser(c)!
   const id = c.req.param("id")
   if (!workspaceRole(id, user.id)) return c.json({ error: "Not a member" }, 403)
   return c.json(listProjects(id))
 })
 
-routes.get("/:id/boards", (c) => {
+routes.get("/workspaces/:id/boards", (c) => {
   const { user } = getAuthUser(c)!
   const id = c.req.param("id")
   if (!workspaceRole(id, user.id)) return c.json({ error: "Not a member" }, 403)
   return c.json(listBoards(id))
 })
 
-routes.patch("/:id", (c) => c.req.json().then(async (body) => {
+routes.patch("/workspaces/:id", (c) => c.req.json().then(async (body) => {
   const { user } = getAuthUser(c)!
   const id = c.req.param("id")
   const role = workspaceRole(id, user.id)
@@ -89,7 +89,7 @@ routes.patch("/:id", (c) => c.req.json().then(async (body) => {
   return c.json(serializeWorkspace(id))
 }))
 
-routes.delete("/:id", (c) => {
+routes.delete("/workspaces/:id", (c) => {
   const { user } = getAuthUser(c)!
   const id = c.req.param("id")
   if (workspaceRole(id, user.id) !== "owner") return c.json({ error: "Only the owner can delete" }, 403)
@@ -99,7 +99,7 @@ routes.delete("/:id", (c) => {
 
 // --- Membership ---
 
-routes.patch("/:id/members/:userId", (c) => c.req.json().then(async (body) => {
+routes.patch("/workspaces/:id/members/:userId", (c) => c.req.json().then(async (body) => {
   const { user } = getAuthUser(c)!
   const id = c.req.param("id")
   const targetId = c.req.param("userId")
@@ -116,7 +116,7 @@ routes.patch("/:id/members/:userId", (c) => c.req.json().then(async (body) => {
   return c.json(serializeWorkspace(id))
 }))
 
-routes.delete("/:id/members/:userId", (c) => {
+routes.delete("/workspaces/:id/members/:userId", (c) => {
   const { user } = getAuthUser(c)!
   const id = c.req.param("id")
   const targetId = c.req.param("userId")
@@ -133,7 +133,7 @@ routes.delete("/:id/members/:userId", (c) => {
 
 // --- Invite / join ---
 
-routes.post("/:id/invite", (c) => c.req.json().then(async (body) => {
+routes.post("/workspaces/:id/invite", (c) => c.req.json().then(async (body) => {
   const { user } = getAuthUser(c)!
   const id = c.req.param("id")
   const role = workspaceRole(id, user.id)
