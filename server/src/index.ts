@@ -34,6 +34,19 @@ app.use(
   })
 )
 
+// Dev-friendly request log: method, path, status, and the error body for
+// failures — makes OAuth/debug flows visible in the terminal.
+app.use("*", async (c, next) => {
+  await next()
+  const res = c.res
+  if (res.status >= 400) {
+    const body = await res.clone().text().catch(() => "")
+    console.log(`[http] ${c.req.method} ${c.req.path} -> ${res.status} ${body.slice(0, 200)}`)
+  } else {
+    console.log(`[http] ${c.req.method} ${c.req.path} -> ${res.status}`)
+  }
+})
+
 app.route("/api/auth", authRoutes)
 app.route("/api", workspaceRoutes)
 app.route("/api", boardRoutes)

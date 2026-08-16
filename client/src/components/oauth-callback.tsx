@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { AlertCircle, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { VoidBoardLogo } from "@/components/VoidBoardLogo"
@@ -8,15 +8,21 @@ import { useToast } from "@/contexts/toast"
 /**
  * Rendered at /oauth/callback — swaps the code for a session, then cleans
  * the URL and lets the app take over.
+ *
+ * The exchange consumes the server-side PKCE verifier and the OAuth code, so
+ * it must run exactly once per page load. In dev, React StrictMode double-
+ * invokes effects — guard with a ref so the second invocation is a no-op.
  */
 export function OAuthCallback() {
   const { completeCallback } = useAuth()
   const { toast } = useToast()
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState(false)
+  const startedRef = useRef(false)
 
   useEffect(() => {
-    if (done) return
+    if (startedRef.current || done) return
+    startedRef.current = true
     completeCallback()
       .then(() => {
         setDone(true)
