@@ -5,17 +5,19 @@
  */
 
 import * as React from "react"
-import { MoreHorizontal, Plus, X } from "lucide-react"
+import { CheckIcon, Gauge, MoreHorizontal, MoveLeft, MoveRight, Pencil, Plus, Trash2, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub,
+  DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
-  ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger,
+  ContextMenu, ContextMenuCheckboxItem, ContextMenuContent, ContextMenuItem, ContextMenuSeparator,
+  ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger,
 } from "@/components/ui/context-menu"
-import { ItemCard } from "@/components/board/item-card"
+import { ItemCard, PRIORITY_LABELS } from "@/components/board/item-card"
 import { cn } from "@/lib/utils"
-import type { Column, Item } from "@/lib/types"
+import type { Column, Item, ItemPriority, Label } from "@/lib/types"
 
 export interface DragState {
   itemId: string
@@ -23,8 +25,12 @@ export interface DragState {
   sourceIndex: number
 }
 
+const PRIORITIES: ItemPriority[] = ["none", "low", "medium", "high", "urgent"]
+
 export function BoardColumn({
   column,
+  columns,
+  labels,
   items,
   wipVisible,
   dragState,
@@ -34,10 +40,18 @@ export function BoardColumn({
   onAddCard,
   onDeleteColumn,
   onDeleteItem,
+  onMoveItem,
+  onSetPriority,
+  onToggleLabel,
+  onMoveColumn,
   onMenuAction,
   dragDisabled = false,
 }: {
   column: Column
+  /** Every column on the board (for the card "move to column" submenu). */
+  columns: Column[]
+  /** Every label on the board (for the card "labels" submenu). */
+  labels: Label[]
   items: Item[]
   wipVisible: boolean
   dragState: DragState | null
@@ -47,6 +61,10 @@ export function BoardColumn({
   onAddCard: (columnId: string, title: string) => Promise<void>
   onDeleteColumn: (column: Column) => void
   onDeleteItem: (item: Item) => void
+  onMoveItem: (item: Item, columnId: string) => void
+  onSetPriority: (item: Item, priority: ItemPriority) => void
+  onToggleLabel: (item: Item, labelId: string) => void
+  onMoveColumn: (column: Column, direction: "left" | "right") => void
   onMenuAction: (action: "rename" | "wip" | "clear-wip", column: Column) => void
   /** True when filters are active — cards are not draggable then. */
   dragDisabled?: boolean
@@ -59,6 +77,8 @@ export function BoardColumn({
   const listRef = React.useRef<HTMLDivElement>(null)
 
   const isSource = dragState?.fromColumnId === column.id
+  const isFirstColumn = columns[0]?.id === column.id
+  const isLastColumn = columns[columns.length - 1]?.id === column.id
 
   const computeDropIndex = (clientY: number): number => {
     const el = listRef.current
@@ -146,11 +166,18 @@ export function BoardColumn({
               </Button>
             }
           />
-          <DropdownMenuContent align="end" className="w-44">
+          <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuItem onSelect={() => setComposing(true)}>
+              <Plus className="size-4" />
+              Add a card
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={() => onMenuAction("rename", column)}>
+              <Pencil className="size-4" />
               Rename column
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => onMenuAction("wip", column)}>
+              <Gauge className="size-4" />
               {column.wipLimit !== null ? "Change WIP limit" : "Set WIP limit"}
             </DropdownMenuItem>
             {column.wipLimit !== null ? (
@@ -158,8 +185,25 @@ export function BoardColumn({
                 Remove WIP limit
               </DropdownMenuItem>
             ) : null}
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <MoveLeft className="size-4 text-muted-foreground" aria-hidden="true" />
+                Move column
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                <DropdownMenuItem disabled={isFirstColumn} onSelect={() => onMoveColumn(column, "left")}>
+                  <MoveLeft className="size-4" />
+                  Move left
+                </DropdownMenuItem>
+                <DropdownMenuItem disabled={isLastColumn} onSelect={() => onMoveColumn(column, "right")}>
+                  <MoveRight className="size-4" />
+                  Move right
+                </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
             <DropdownMenuSeparator />
             <DropdownMenuItem variant="destructive" onSelect={() => onDeleteColumn(column)}>
+              <Trash2 className="size-4" />
               Delete column
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -201,10 +245,55 @@ export function BoardColumn({
                       />
                     }
                   />
-                  <ContextMenuContent className="w-40">
-                    <ContextMenuItem onSelect={() => onOpen(item)}>Open card</ContextMenuItem>
+                  <ContextMenuContent className="w-48">
+                    <ContextMenuItem onSelect={() => onOpen(item)}>
+                      Open card
+                    </ContextMenuItem>
                     <ContextMenuSeparator />
-                    <ContextMenuItem variant="destructive" onSelect={() => onDeleteItem(item)}>Delete card</ContextMenuItem>
+                    <ContextMenuSub>
+                      <ContextMenuSubTrigger>Move to column</ContextMenuSubTrigger>
+                      <ContextMenuSubContent className="max-h-64">
+                        {columns.map((col) => (
+                          <ContextMenuItem key={col.id} disabled={col.id === item.columnId} onSelect={() => onMoveItem(item, col.id)}>
+                            {col.id === item.columnId ? <CheckIcon className="size-4" /> : null}
+                            {col.name}
+                          </ContextMenuItem>
+                        ))}
+                      </ContextMenuSubContent>
+                    </ContextMenuSub>
+                    <ContextMenuSub>
+                      <ContextMenuSubTrigger>Set priority</ContextMenuSubTrigger>
+                      <ContextMenuSubContent className="max-h-64">
+                        {PRIORITIES.map((p) => (
+                          <ContextMenuItem key={p} disabled={p === item.priority} onSelect={() => onSetPriority(item, p)}>
+                            {p === item.priority ? <CheckIcon className="size-4" /> : null}
+                            {PRIORITY_LABELS[p]}
+                          </ContextMenuItem>
+                        ))}
+                      </ContextMenuSubContent>
+                    </ContextMenuSub>
+                    {labels.length > 0 ? (
+                      <ContextMenuSub>
+                        <ContextMenuSubTrigger>Labels</ContextMenuSubTrigger>
+                        <ContextMenuSubContent className="max-h-64">
+                          {labels.map((l) => (
+                            <ContextMenuCheckboxItem
+                              key={l.id}
+                              checked={item.labels.some((x) => x.id === l.id)}
+                              onCheckedChange={() => onToggleLabel(item, l.id)}
+                            >
+                              <span className="size-2.5 shrink-0 rounded-full" style={{ background: l.color }} aria-hidden="true" />
+                              <span className="truncate">{l.name}</span>
+                            </ContextMenuCheckboxItem>
+                          ))}
+                        </ContextMenuSubContent>
+                      </ContextMenuSub>
+                    ) : null}
+                    <ContextMenuSeparator />
+                    <ContextMenuItem variant="destructive" onSelect={() => onDeleteItem(item)}>
+                      <Trash2 className="size-4" />
+                      Delete card
+                    </ContextMenuItem>
                   </ContextMenuContent>
                 </ContextMenu>
               </React.Fragment>
@@ -256,11 +345,18 @@ export function BoardColumn({
           </section>
         }
       />
-      <ContextMenuContent className="w-44">
+      <ContextMenuContent className="w-48">
+        <ContextMenuItem onSelect={() => setComposing(true)}>
+          <Plus className="size-4" />
+          Add a card
+        </ContextMenuItem>
+        <ContextMenuSeparator />
         <ContextMenuItem onSelect={() => onMenuAction("rename", column)}>
+          <Pencil className="size-4" />
           Rename column
         </ContextMenuItem>
         <ContextMenuItem onSelect={() => onMenuAction("wip", column)}>
+          <Gauge className="size-4" />
           {column.wipLimit !== null ? "Change WIP limit" : "Set WIP limit"}
         </ContextMenuItem>
         {column.wipLimit !== null ? (
@@ -268,8 +364,25 @@ export function BoardColumn({
             Remove WIP limit
           </ContextMenuItem>
         ) : null}
+        <ContextMenuSub>
+          <ContextMenuSubTrigger>
+            <MoveLeft className="size-4 text-muted-foreground" aria-hidden="true" />
+            Move column
+          </ContextMenuSubTrigger>
+          <ContextMenuSubContent>
+            <ContextMenuItem disabled={isFirstColumn} onSelect={() => onMoveColumn(column, "left")}>
+              <MoveLeft className="size-4" />
+              Move left
+            </ContextMenuItem>
+            <ContextMenuItem disabled={isLastColumn} onSelect={() => onMoveColumn(column, "right")}>
+              <MoveRight className="size-4" />
+              Move right
+            </ContextMenuItem>
+          </ContextMenuSubContent>
+        </ContextMenuSub>
         <ContextMenuSeparator />
         <ContextMenuItem variant="destructive" onSelect={() => onDeleteColumn(column)}>
+          <Trash2 className="size-4" />
           Delete column
         </ContextMenuItem>
       </ContextMenuContent>

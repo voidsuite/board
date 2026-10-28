@@ -52,13 +52,13 @@ export function SettingsSheet({ open, onOpenChange }: { open: boolean; onOpenCha
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-[340px] sm:max-w-[340px]">
+      <SheetContent side="right" className="data-[side=right]:w-[min(92vw,400px)] sm:data-[side=right]:w-[400px] sm:data-[side=right]:max-w-[400px]">
         <SheetHeader>
           <SheetTitle>Settings</SheetTitle>
           <SheetDescription>Theme, accent and your account.</SheetDescription>
         </SheetHeader>
 
-        <div className="mt-4 space-y-5">
+        <div className="mt-4 space-y-5 px-4 pb-4">
           {/* Theme */}
           <div className="space-y-2">
             <Label className="text-xs font-medium text-muted-foreground">Theme</Label>

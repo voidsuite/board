@@ -26,7 +26,7 @@ import { useBoard } from "@/lib/use-board"
 import { useAuth } from "@/contexts/auth"
 import { useToast } from "@/contexts/toast"
 import { cn } from "@/lib/utils"
-import type { Column, Item } from "@/lib/types"
+import type { Column, Item, ItemPriority } from "@/lib/types"
 
 type View = "board" | "table" | "list"
 
@@ -132,6 +132,35 @@ export function BoardPage() {
 
   const dropCard = (itemId: string, columnId: string, index: number) => {
     run(board.moveItem(itemId, columnId, index), "Couldn't move card")
+  }
+
+  /**
+   * Move a card to another column from the table/list/context-menu paths.
+   * Appends it at the end of the target column, mirroring the store's move
+   * semantics used by drag & drop. Safe even while filters are active —
+   * unlike drag-reorder, the destination index comes from the full
+   * unfiltered column.
+   */
+  const moveItemToColumn = (item: Item, columnId: string) => {
+    if (columnId === item.columnId) return
+    run(board.moveItem(item.id, columnId, board.itemsIn(columnId).length), "Couldn't move card")
+  }
+
+  const setPriority = (item: Item, priority: ItemPriority) => {
+    if (priority === item.priority) return
+    run(board.updateItem(item.id, { priority }), "Couldn't update priority")
+  }
+
+  const toggleLabel = (item: Item, labelId: string) => {
+    const has = item.labels.some((l) => l.id === labelId)
+    const next = has
+      ? item.labels.filter((l) => l.id !== labelId).map((l) => l.id)
+      : [...item.labels.map((l) => l.id), labelId]
+    run(board.setItemLabels(item.id, next), "Couldn't update labels")
+  }
+
+  const moveColumn = (column: Column, direction: "left" | "right") => {
+    run(board.moveColumn(column.id, direction), "Couldn't move column")
   }
 
   const addCard = async (columnId: string, title: string) => {
@@ -287,6 +316,8 @@ export function BoardPage() {
                 <BoardColumn
                   key={column.id}
                   column={column}
+                  columns={board.columns}
+                  labels={board.labels}
                   items={board.itemsIn(column.id).filter((i) => matchesFilters(i, filters))}
                   wipVisible
                   dragState={filtersActive ? null : dragState}
@@ -300,6 +331,10 @@ export function BoardPage() {
                   onAddCard={addCard}
                   onDeleteColumn={(c) => setDeletingColumn(c)}
                   onDeleteItem={(item) => setDeletingItem(item)}
+                  onMoveItem={moveItemToColumn}
+                  onSetPriority={setPriority}
+                  onToggleLabel={toggleLabel}
+                  onMoveColumn={moveColumn}
                   onMenuAction={(action, column) => {
                     if (action === "clear-wip") {
                       run(board.setColumnWip(column.id, null), "Couldn't update WIP limit")
@@ -323,9 +358,9 @@ export function BoardPage() {
         ) : (
           <div className="voidboard-scrollbar flex-1 overflow-y-auto px-4 py-4">
             {view === "table" ? (
-              <TableView columns={board.columns} items={visibleItems} onOpen={(item) => setOpenItemId(item.id)} />
+              <TableView columns={board.columns} items={visibleItems} onOpen={(item) => setOpenItemId(item.id)} onMoveItem={moveItemToColumn} />
             ) : (
-              <ListView columns={board.columns} items={visibleItems} onOpen={(item) => setOpenItemId(item.id)} />
+              <ListView columns={board.columns} items={visibleItems} onOpen={(item) => setOpenItemId(item.id)} onMoveItem={moveItemToColumn} />
             )}
           </div>
         )}

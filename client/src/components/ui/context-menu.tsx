@@ -6,6 +6,7 @@
 
 import * as React from "react"
 import { ContextMenu as ContextMenuPrimitive } from "@base-ui/react/context-menu"
+import { CheckIcon, ChevronRightIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
@@ -19,14 +20,23 @@ function ContextMenuTrigger({ ...props }: React.ComponentPropsWithRef<typeof Con
 
 function ContextMenuContent({
   className,
+  align = "start",
+  alignOffset = 0,
+  side = "bottom",
+  sideOffset = 4,
   ...props
-}: React.ComponentPropsWithRef<typeof ContextMenuPrimitive.Popup>) {
+}: ContextMenuPrimitive.Popup.Props &
+  Pick<
+    ContextMenuPrimitive.Positioner.Props,
+    "align" | "alignOffset" | "side" | "sideOffset"
+  >) {
   return (
     <ContextMenuPrimitive.Portal>
       <ContextMenuPrimitive.Positioner
-        side="bottom"
-        align="start"
-        sideOffset={4}
+        side={side}
+        align={align}
+        alignOffset={alignOffset}
+        sideOffset={sideOffset}
         className="isolate z-50 outline-none"
       >
         <ContextMenuPrimitive.Popup
@@ -89,6 +99,84 @@ function ContextMenuItem({
   )
 }
 
+function ContextMenuSub({ ...props }: ContextMenuPrimitive.SubmenuRoot.Props) {
+  return <ContextMenuPrimitive.SubmenuRoot data-slot="context-menu-sub" {...props} />
+}
+
+function ContextMenuSubTrigger({
+  className,
+  inset,
+  children,
+  ...props
+}: ContextMenuPrimitive.SubmenuTrigger.Props & {
+  inset?: boolean
+}) {
+  return (
+    <ContextMenuPrimitive.SubmenuTrigger
+      data-slot="context-menu-sub-trigger"
+      data-inset={inset}
+      className={cn(
+        "flex cursor-default items-center gap-1.5 rounded-md px-1.5 py-1 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground data-inset:pl-7 data-popup-open:bg-accent data-popup-open:text-accent-foreground data-open:bg-accent data-open:text-accent-foreground [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        className
+      )}
+      {...props}
+    >
+      {children}
+      <ChevronRightIcon className="ml-auto" />
+    </ContextMenuPrimitive.SubmenuTrigger>
+  )
+}
+
+function ContextMenuSubContent({
+  className,
+  ...props
+}: React.ComponentProps<typeof ContextMenuContent>) {
+  return (
+    <ContextMenuContent
+      data-slot="context-menu-sub-content"
+      className={cn("w-auto min-w-[96px] rounded-lg bg-popover p-1 text-popover-foreground shadow-lg ring-1 ring-foreground/10 duration-100", className)}
+      align="start"
+      alignOffset={-3}
+      side="right"
+      sideOffset={0}
+      {...props}
+    />
+  )
+}
+
+function ContextMenuCheckboxItem({
+  className,
+  children,
+  checked,
+  inset,
+  ...props
+}: ContextMenuPrimitive.CheckboxItem.Props & {
+  inset?: boolean
+}) {
+  return (
+    <ContextMenuPrimitive.CheckboxItem
+      data-slot="context-menu-checkbox-item"
+      data-inset={inset}
+      className={cn(
+        "relative flex cursor-default items-center gap-1.5 rounded-md py-1 pr-8 pl-1.5 text-sm outline-hidden select-none focus:bg-accent focus:text-accent-foreground focus:**:text-accent-foreground data-inset:pl-7 data-disabled:pointer-events-none data-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        className
+      )}
+      checked={checked}
+      {...props}
+    >
+      <span
+        className="pointer-events-none absolute right-2 flex items-center justify-center"
+        data-slot="context-menu-checkbox-item-indicator"
+      >
+        <ContextMenuPrimitive.CheckboxItemIndicator>
+          <CheckIcon />
+        </ContextMenuPrimitive.CheckboxItemIndicator>
+      </span>
+      {children}
+    </ContextMenuPrimitive.CheckboxItem>
+  )
+}
+
 function ContextMenuSeparator({
   className,
   ...props
@@ -125,6 +213,10 @@ export {
   ContextMenuGroup,
   ContextMenuLabel,
   ContextMenuItem,
+  ContextMenuCheckboxItem,
   ContextMenuSeparator,
   ContextMenuShortcut,
+  ContextMenuSub,
+  ContextMenuSubTrigger,
+  ContextMenuSubContent,
 }

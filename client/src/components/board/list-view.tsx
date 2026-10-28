@@ -4,6 +4,7 @@
 
 import { Calendar, Paperclip } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { ColumnSelect } from "@/components/board/column-select"
 import { initials } from "@/components/workspace-icon"
 import { cn } from "@/lib/utils"
 import type { Column, Item } from "@/lib/types"
@@ -12,10 +13,12 @@ export function ListView({
   columns,
   items,
   onOpen,
+  onMoveItem,
 }: {
   columns: Column[]
   items: Item[]
   onOpen: (item: Item) => void
+  onMoveItem: (item: Item, columnId: string) => void
 }) {
   return (
     <div className="voidboard-scrollbar space-y-5 overflow-y-auto">
@@ -39,11 +42,19 @@ export function ListView({
               ) : (
                 <div className="overflow-hidden rounded-xl border border-border bg-background">
                   {columnItems.map((item, i) => (
-                    <button
+                    <div
                       key={item.id}
+                      role="button"
+                      tabIndex={0}
                       onClick={() => onOpen(item)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault()
+                          onOpen(item)
+                        }
+                      }}
                       className={cn(
-                        "flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted/50",
+                        "flex w-full cursor-pointer items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted/50",
                         i > 0 && "border-t border-border/60"
                       )}
                     >
@@ -78,7 +89,8 @@ export function ListView({
                           ))}
                         </span>
                       ) : null}
-                    </button>
+                      <ColumnSelect columns={columns} item={item} onMoveItem={onMoveItem} compact />
+                    </div>
                   ))}
                 </div>
               )}

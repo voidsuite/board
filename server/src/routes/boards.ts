@@ -109,6 +109,30 @@ routes.delete("/columns/:id", (c) => {
   return c.json({ ok: true })
 })
 
+routes.post("/boards/:id/columns/order", async (c) => {
+  const { user } = getAuthUser(c)!
+  const boardId = c.req.param("id")
+  const ws = boardWorkspace(boardId, user.id)
+  if (!ws) return c.json({ error: "Not found" }, 404)
+  const body = await c.req.json().catch(() => null)
+  const orderedIds: string[] = Array.isArray(body?.orderedIds) ? (body.orderedIds as unknown[]).map(String) : []
+
+  // The payload must be exactly the board's current columns, no dupes.
+  const current = db.query("SELECT id FROM columns WHERE board_id = ?").all(boardId) as { id: string }[]
+  const ids = new Set(current.map((r) => r.id))
+  const unique = new Set(orderedIds)
+  if (orderedIds.length !== ids.size || unique.size !== orderedIds.length || orderedIds.some((id) => !ids.has(id))) {
+    return c.json({ error: "Invalid column order" }, 400)
+  }
+
+  db.transaction(() => {
+    const stmt = db.query("UPDATE columns SET position = ? WHERE id = ?")
+    orderedIds.forEach((id, i) => stmt.run(i, id))
+  })()
+  broadcastToBoard(boardId, { type: "column.order", boardId, orderedIds, actorId: user.id })
+  return c.json({ ok: true })
+})
+
 // --- Items ---
 
 const PRIORITIES = new Set(["none", "low", "medium", "high", "urgent"])

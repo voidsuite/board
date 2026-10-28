@@ -26,7 +26,7 @@ import { PRIORITY_COLORS, PRIORITY_LABELS } from "@/components/board/item-card"
 import { initials } from "@/components/workspace-icon"
 import { renderMarkdown } from "@/lib/markdown"
 import { fileUrl } from "@/lib/api"
-import { useBoard } from "@/lib/use-board"
+import { useBoard, type CursorUser } from "@/lib/use-board"
 import { cn } from "@/lib/utils"
 import type { ActivityEvent, Comment, Item, ItemPriority, Label as LabelModel, WorkspaceMember } from "@/lib/types"
 
@@ -424,7 +424,16 @@ export function ItemDialog({
     return () => board.sendCursor(null)
   }, [open, item.id, board])
 
-  const viewersHere = board.viewers.filter((v) => v.itemId === item.id)
+  // Who was viewing this card when the dialog opened, frozen as a snapshot.
+  // The live cursor feed churns the footer (viewer PFPs + status) every time
+  // someone's cursor moves, which reads as a constant flicker — so the footer
+  // reflects who was here at open time instead of tracking them live.
+  const [viewersAtOpen, setViewersAtOpen] = React.useState<CursorUser[]>([])
+  React.useEffect(() => {
+    if (open) setViewersAtOpen(board.viewers.filter((v) => v.itemId === item.id))
+    // Snapshot on open only — deliberately not re-run when viewers change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, item.id])
 
   const members: WorkspaceMember[] = board.workspace?.members ?? []
   const assigneeIds = new Set(item.assignees.map((a) => a.id))
@@ -672,10 +681,10 @@ export function ItemDialog({
 
           {/* Footer */}
           <div className="flex items-center gap-3 border-t border-border px-5 py-3">
-            {viewersHere.length > 0 ? (
+            {viewersAtOpen.length > 0 ? (
               <span className="flex items-center gap-1">
                 <span className="flex -space-x-1.5 *:ring-2 *:ring-background">
-                  {viewersHere.slice(0, 3).map((v) => (
+                  {viewersAtOpen.slice(0, 3).map((v) => (
                     <Avatar key={v.userId} size="sm">
                       <AvatarImage src={v.picture || undefined} alt={v.name} />
                       <AvatarFallback className="text-[8px]">{initials(v.name)}</AvatarFallback>

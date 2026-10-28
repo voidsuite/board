@@ -5,9 +5,9 @@
 
 import { Calendar, Paperclip } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { PRIORITY_COLORS, PRIORITY_LABELS } from "@/components/board/item-card"
+import { ColumnSelect } from "@/components/board/column-select"
 import { initials } from "@/components/workspace-icon"
 import { cn } from "@/lib/utils"
 import type { Column, Item } from "@/lib/types"
@@ -16,12 +16,13 @@ export function TableView({
   columns,
   items,
   onOpen,
+  onMoveItem,
 }: {
   columns: Column[]
   items: Item[]
   onOpen: (item: Item) => void
+  onMoveItem: (item: Item, columnId: string) => void
 }) {
-  const columnName = (id: string) => columns.find((c) => c.id === id)?.name ?? "—"
   const sorted = [...items].sort((a, b) => {
     const ca = columns.findIndex((c) => c.id === a.columnId)
     const cb = columns.findIndex((c) => c.id === b.columnId)
@@ -62,7 +63,7 @@ export function TableView({
                   </div>
                 </TableCell>
                 <TableCell>
-                  <Badge variant="secondary" className="text-xs font-normal">{columnName(item.columnId)}</Badge>
+                  <ColumnSelect columns={columns} item={item} onMoveItem={onMoveItem} />
                 </TableCell>
                 <TableCell>
                   {item.priority === "none" ? (

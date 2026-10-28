@@ -43,6 +43,8 @@ export interface BoardStore {
   renameColumn: (columnId: string, name: string) => Promise<void>
   setColumnWip: (columnId: string, wipLimit: number | null) => Promise<void>
   deleteColumn: (columnId: string) => Promise<void>
+  /** Move a column one slot left/right on the board. */
+  moveColumn: (columnId: string, direction: "left" | "right") => Promise<void>
   renameBoard: (name: string) => Promise<void>
   /** Set (upload) or clear (null) the board avatar photo. */
   setBoardAvatar: (file: File | null) => Promise<void>
@@ -201,7 +203,11 @@ export function useBoard(boardId: string): BoardStore {
   const createColumn = React.useCallback(
     async (name: string) => {
       const column = await api.createColumn(boardId, name)
-      setColumns((prev) => [...prev, column])
+      // The server also echoes column.upsert back over the socket (it runs
+      // before the HTTP response resolves), so dedupe by id — otherwise the
+      // echo + this append recreate the column twice when the socket wins
+      // the race against the fetch.
+      setColumns((prev) => (prev.some((c) => c.id === column.id) ? prev.map((c) => (c.id === column.id ? column : c)) : [...prev, column]))
     },
     [boardId]
   )
@@ -263,6 +269,26 @@ export function useBoard(boardId: string): BoardStore {
       }
     },
     [columns, items]
+  )
+
+  const moveColumn = React.useCallback(
+    async (columnId: string, direction: "left" | "right") => {
+      const before = columns
+      const index = columns.findIndex((c) => c.id === columnId)
+      if (index < 0) return
+      const swap = direction === "left" ? index - 1 : index + 1
+      if (swap < 0 || swap >= columns.length) return
+      const next = [...columns]
+      ;[next[index], next[swap]] = [next[swap], next[index]]
+      setColumns(next)
+      try {
+        await api.reorderColumns(boardId, next.map((c) => c.id))
+      } catch (e) {
+        setColumns(before)
+        throw e
+      }
+    },
+    [columns, boardId]
   )
 
   const createLabel = React.useCallback(
@@ -440,6 +466,15 @@ export function useBoard(boardId: string): BoardStore {
           for (const i of Object.values(next)) if (i.columnId === cid) delete next[i.id]
           return next
         })
+      } else if (type === "column.order" && Array.isArray(ev.orderedIds)) {
+        // Full ordered id list — reorder the local array to match (idempotent).
+        const order = ev.orderedIds as string[]
+        setColumns((prev) => {
+          if (prev.length !== order.length) return prev
+          const byId = new Map(prev.map((c) => [c.id, c]))
+          const next = order.map((id) => byId.get(id) as Column | undefined)
+          return next.every(Boolean) ? (next as Column[]) : prev
+        })
       } else if (type === "label.upsert" && ev.label) {
         const label = ev.label as Label
         setLabels((prev) => (prev.some((l) => l.id === label.id) ? prev.map((l) => (l.id === label.id ? label : l)) : [...prev, label]))
@@ -550,7 +585,7 @@ export function useBoard(boardId: string): BoardStore {
   return {
     status, error, board, workspace, columns, labels, getLabel, itemsIn, item, reload, refresh,
     socketState, presence, viewers, sendCursor,
-    createColumn, renameColumn, setColumnWip, deleteColumn, renameBoard, setBoardAvatar,
+    createColumn, renameColumn, setColumnWip, deleteColumn, moveColumn, renameBoard, setBoardAvatar,
     createItem, updateItem, moveItem, deleteItem,
     createLabel, updateLabel, deleteLabel, setItemLabels, setItemAssignees,
     addComment, addChecklistEntry, setChecklistEntry, deleteChecklistEntry,
